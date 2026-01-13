@@ -1,6 +1,8 @@
 # tt
 
-tt is a local-first, macOS-only time tracker with a brutalist, text-first UI.
+tt is a local-first, macOS-only time tracker with a brutalist, text-first ui.
+
+co-evolved using ai.
 
 * * *
 
