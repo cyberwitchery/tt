@@ -24,7 +24,6 @@ enum BrutalistTheme {
     static let tightPadding: CGFloat = 4
     static let dividerTopPadding: CGFloat = 0
     static let dividerBottomPadding: CGFloat = 10
-    static let titleInsetLeading: CGFloat = 72
 }
 
 struct BrutalistTextButton: View {

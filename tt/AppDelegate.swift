@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var allowTerminate = false
     private var eventMonitor: Any?
     private var localEventMonitor: Any?
+    private var titleAccessory: NSTitlebarAccessoryViewController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let appState = AppState.shared
@@ -61,9 +62,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showMainWindow() {
         if mainWindow == nil {
+            let desiredWidth: CGFloat = 520
+            let hostingController = NSHostingController(rootView: MainWindowView(appState: AppState.shared))
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 520, height: 740),
-                styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                contentRect: NSRect(x: 0, y: 0, width: desiredWidth, height: 740),
+                styleMask: [.titled, .closable, .miniaturizable],
                 backing: .buffered,
                 defer: false
             )
@@ -73,13 +76,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.titlebarSeparatorStyle = .none
             window.styleMask.insert(.fullSizeContentView)
             window.isReleasedWhenClosed = false
-            window.contentView = NSHostingView(rootView: MainWindowView(appState: AppState.shared))
+            window.contentViewController = hostingController
+            let fittingSize = hostingController.sizeThatFits(in: NSSize(width: desiredWidth, height: .greatestFiniteMagnitude))
+            window.setContentSize(NSSize(width: desiredWidth, height: fittingSize.height))
+            if titleAccessory == nil {
+                let container = NSView(frame: NSRect(x: 0, y: 0, width: 120, height: 24))
+                let label = NSTextField(labelWithString: "tt")
+                label.frame = NSRect(x: 0, y: 4, width: 120, height: 16)
+                label.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .bold)
+                label.textColor = NSColor.labelColor
+                label.alignment = .left
+                container.addSubview(label)
+                let accessory = NSTitlebarAccessoryViewController()
+                accessory.view = container
+                accessory.layoutAttribute = .leading
+                titleAccessory = accessory
+            }
             mainWindow = window
         }
 
         mainWindow?.center()
         mainWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        if let mainWindow, let titleAccessory, !mainWindow.titlebarAccessoryViewControllers.contains(titleAccessory) {
+            mainWindow.addTitlebarAccessoryViewController(titleAccessory)
+        }
     }
 
     @objc private func requestQuit() {

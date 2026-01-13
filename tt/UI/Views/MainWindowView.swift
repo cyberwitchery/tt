@@ -28,43 +28,54 @@ struct MainWindowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrutalistTheme.sectionSpacing) {
-            Text("tt")
-                .font(BrutalistTheme.titleFont)
-                .foregroundColor(BrutalistTheme.foreground(for: colorScheme))
-                .padding(.leading, BrutalistTheme.titleInsetLeading)
-
             VStack(alignment: .leading, spacing: BrutalistTheme.rowSpacing) {
                 Text("today")
                     .font(BrutalistTheme.sectionFont)
                     .foregroundColor(BrutalistTheme.foreground(for: colorScheme))
 
-                Text("project")
-                    .font(BrutalistTheme.labelFont)
-                    .foregroundColor(BrutalistTheme.secondary(for: colorScheme))
+                Grid(alignment: .leading, horizontalSpacing: BrutalistTheme.tightPadding, verticalSpacing: BrutalistTheme.rowSpacing) {
+                    GridRow {
+                        Text("project")
+                            .font(BrutalistTheme.labelFont)
+                            .foregroundColor(BrutalistTheme.secondary(for: colorScheme))
+                            .frame(width: 56, alignment: .leading)
 
-                Picker("", selection: Binding(
-                    get: { appState.selectedProjectId ?? "" },
-                    set: { appState.selectProject(id: $0) }
-                )) {
-                    ForEach(appState.projects) { project in
-                        Text(project.name.lowercased()).tag(project.id)
+                        Picker("", selection: Binding(
+                            get: { appState.selectedProjectId ?? "" },
+                            set: { appState.selectProject(id: $0) }
+                        )) {
+                            ForEach(appState.projects) { project in
+                                Text(project.name.lowercased()).tag(project.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .font(BrutalistTheme.bodyFont)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                }
-                .labelsHidden()
-                .font(BrutalistTheme.bodyFont)
-                .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text(TimeMath.formatHMS(seconds: appState.elapsedSeconds))
-                    .font(BrutalistTheme.bodyFont)
-                    .foregroundColor(BrutalistTheme.foreground(for: colorScheme))
+                    GridRow {
+                        Text("timer")
+                            .font(BrutalistTheme.labelFont)
+                            .foregroundColor(BrutalistTheme.secondary(for: colorScheme))
+                            .frame(width: 56, alignment: .leading)
 
-                if appState.runningEntry == nil {
-                    BrutalistTextButton(title: "start") {
-                        appState.startTimer()
-                    }
-                } else {
-                    BrutalistTextButton(title: "stop") {
-                        appState.stopTimer()
+                        HStack(spacing: BrutalistTheme.tightPadding) {
+                            Spacer()
+                            Text(TimeMath.formatHMS(seconds: appState.elapsedSeconds))
+                                .font(BrutalistTheme.sectionFont)
+                                .foregroundColor(BrutalistTheme.foreground(for: colorScheme))
+                                .frame(minWidth: 80, alignment: .trailing)
+
+                            if appState.runningEntry == nil {
+                                BrutalistTextButton(title: "start") {
+                                    appState.startTimer()
+                                }
+                            } else {
+                                BrutalistTextButton(title: "stop") {
+                                    appState.stopTimer()
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -323,9 +334,9 @@ struct MainWindowView: View {
             }
         }
         .padding(BrutalistTheme.padding)
-        .frame(minWidth: 480, minHeight: 360, alignment: .topLeading)
+        .frame(width: 520, alignment: .topLeading)
+        .fixedSize(horizontal: false, vertical: true)
         .background(BrutalistTheme.background(for: colorScheme))
-        .ignoresSafeArea(.container, edges: .top)
     }
 
     private func entryTimeLabel(_ entry: TimeEntry) -> String {
