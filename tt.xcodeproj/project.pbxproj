@@ -26,6 +26,7 @@
 		A10000000000000000000045 /* CSVExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000046 /* CSVExporter.swift */; };
 		A10000000000000000000047 /* ReportBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* ReportBuilderTests.swift */; };
 		A10000000000000000000049 /* CSVExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000004A /* CSVExporterTests.swift */; };
+		A1000000000000000000004C /* BrutalistPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000004B /* BrutalistPicker.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,6 +69,7 @@
 		A1000000000000000000004A /* CSVExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVExporterTests.swift; sourceTree = "<group>"; };
 		A1000000000000000000001E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1000000000000000000001F /* ttTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = ttTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1000000000000000000004B /* BrutalistPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrutalistPicker.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -183,6 +185,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000000000000000000001A /* SectionDivider.swift */,
+				A1000000000000000000004B /* BrutalistPicker.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -302,6 +305,7 @@
 				A10000000000000000000008 /* TimeEntryRepository.swift in Sources */,
 				A10000000000000000000009 /* BrutalistTheme.swift in Sources */,
 				A1000000000000000000000A /* SectionDivider.swift in Sources */,
+				A1000000000000000000004C /* BrutalistPicker.swift in Sources */,
 				A1000000000000000000000B /* StatusPopoverView.swift in Sources */,
 				A10000000000000000000041 /* MainWindowView.swift in Sources */,
 			);

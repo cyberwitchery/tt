@@ -5,71 +5,53 @@ struct StatusPopoverView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: BrutalistTheme.sectionSpacing) {
-            HStack(spacing: BrutalistTheme.tightPadding) {
+        VStack(alignment: .leading, spacing: BrutalistTheme.groupSpacing) {
+            // Header
+            HStack {
                 Text("tt")
                     .font(BrutalistTheme.titleFont)
                     .foregroundColor(BrutalistTheme.foreground(for: colorScheme))
                 Spacer()
-                BrutalistTextButton(title: "open") {
+                BrutalistTextButton(title: "open", muted: true) {
                     NotificationCenter.default.post(name: .ttShowMainWindow, object: nil)
                     NotificationCenter.default.post(name: .ttHidePanel, object: nil)
                 }
-                BrutalistTextButton(title: "quit") {
+                BrutalistTextButton(title: "quit", muted: true) {
                     NotificationCenter.default.post(name: .ttRequestQuit, object: nil)
                 }
             }
 
-            Grid(alignment: .leading, horizontalSpacing: BrutalistTheme.tightPadding, verticalSpacing: BrutalistTheme.rowSpacing) {
-                GridRow {
-                    Text("project")
-                        .font(BrutalistTheme.labelFont)
-                        .foregroundColor(BrutalistTheme.secondary(for: colorScheme))
-                        .frame(width: 56, alignment: .leading)
+            // Project
+            HStack(spacing: BrutalistTheme.tightSpacing) {
+                Text("project")
+                    .brutalistMuted(colorScheme)
+                BrutalistPicker(
+                    items: appState.projects,
+                    selection: Binding(
+                        get: { appState.selectedProjectId },
+                        set: { if let id = $0 { appState.selectProject(id: id) } }
+                    ),
+                    itemLabel: { $0.name.lowercased() }
+                )
+            }
 
-                    Picker("", selection: Binding(
-                        get: { appState.selectedProjectId ?? "" },
-                        set: { appState.selectProject(id: $0) }
-                    )) {
-                        ForEach(appState.projects) { project in
-                            Text(project.name.lowercased()).tag(project.id)
-                        }
-                    }
-                    .labelsHidden()
-                    .font(BrutalistTheme.bodyFont)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
+            // Timer
+            HStack(alignment: .firstTextBaseline) {
+                Text(TimeMath.formatHMS(seconds: appState.elapsedSeconds))
+                    .font(BrutalistTheme.displayFont)
+                    .foregroundColor(BrutalistTheme.foreground(for: colorScheme))
 
-                GridRow {
-                    Text("timer")
-                        .font(BrutalistTheme.labelFont)
-                        .foregroundColor(BrutalistTheme.secondary(for: colorScheme))
-                        .frame(width: 56, alignment: .leading)
+                Spacer()
 
-                    HStack(spacing: BrutalistTheme.tightPadding) {
-                        Spacer()
-                        Text(TimeMath.formatHMS(seconds: appState.elapsedSeconds))
-                            .font(BrutalistTheme.sectionFont)
-                            .foregroundColor(BrutalistTheme.foreground(for: colorScheme))
-                            .frame(minWidth: 80, alignment: .trailing)
-
-                        if appState.runningEntry == nil {
-                            BrutalistTextButton(title: "start") {
-                                appState.startTimer()
-                            }
-                        } else {
-                            BrutalistTextButton(title: "stop") {
-                                appState.stopTimer()
-                            }
-                        }
-                    }
+                if appState.runningEntry == nil {
+                    BrutalistTextButton(title: "start", action: { appState.startTimer() })
+                } else {
+                    BrutalistTextButton(title: "stop", action: { appState.stopTimer() })
                 }
             }
         }
-        .padding(.horizontal, BrutalistTheme.padding)
-        .padding(.bottom, BrutalistTheme.padding)
-        .padding(.top, BrutalistTheme.tightPadding)
-        .frame(width: 300)
+        .padding(BrutalistTheme.padding)
+        .frame(width: 280)
         .background(BrutalistTheme.background(for: colorScheme))
     }
 }

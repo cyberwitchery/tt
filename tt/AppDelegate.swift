@@ -62,10 +62,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showMainWindow() {
         if mainWindow == nil {
-            let desiredWidth: CGFloat = 520
             let hostingController = NSHostingController(rootView: MainWindowView(appState: AppState.shared))
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: desiredWidth, height: 740),
+                contentRect: NSRect(x: 0, y: 0, width: 400, height: 610),
                 styleMask: [.titled, .closable, .miniaturizable],
                 backing: .buffered,
                 defer: false
@@ -77,13 +76,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.styleMask.insert(.fullSizeContentView)
             window.isReleasedWhenClosed = false
             window.contentViewController = hostingController
-            let fittingSize = hostingController.sizeThatFits(in: NSSize(width: desiredWidth, height: .greatestFiniteMagnitude))
-            window.setContentSize(NSSize(width: desiredWidth, height: fittingSize.height))
+            window.setContentSize(NSSize(width: 400, height: 610))
+            window.initialFirstResponder = nil
             if titleAccessory == nil {
                 let container = NSView(frame: NSRect(x: 0, y: 0, width: 120, height: 24))
                 let label = NSTextField(labelWithString: "tt")
                 label.frame = NSRect(x: 0, y: 4, width: 120, height: 16)
-                label.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .bold)
+                label.font = NSFont.monospacedSystemFont(ofSize: 14, weight: .bold)
                 label.textColor = NSColor.labelColor
                 label.alignment = .left
                 container.addSubview(label)
@@ -97,6 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         mainWindow?.center()
         mainWindow?.makeKeyAndOrderFront(nil)
+        mainWindow?.makeFirstResponder(nil)
         NSApp.activate(ignoringOtherApps: true)
         if let mainWindow, let titleAccessory, !mainWindow.titlebarAccessoryViewControllers.contains(titleAccessory) {
             mainWindow.addTitlebarAccessoryViewController(titleAccessory)
