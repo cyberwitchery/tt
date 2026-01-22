@@ -30,11 +30,9 @@ jobs:
 
       - name: Check coverage threshold
         run: |
-          COVERAGE=$(xcrun xccov view --report --only-targets TestResults.xcresult | \
-            grep 'tt.app' | \
-            head -1 | \
-            awk '{print $NF}' | \
-            sed 's/%//')
+          # Get coverage as JSON for reliable parsing
+          COVERAGE=$(xcrun xccov view --report --json TestResults.xcresult | \
+            python3 -c "import sys, json; data = json.load(sys.stdin); print(f\"{data['lineCoverage'] * 100:.1f}\")")
 
           echo "Coverage: ${COVERAGE}%"
           echo "Minimum: ${MIN_COVERAGE}%"

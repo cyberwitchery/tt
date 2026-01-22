@@ -272,4 +272,75 @@ final class TimeEntryRepositoryTests: XCTestCase {
         XCTAssertEqual(all.count, 1)
         XCTAssertNotNil(all[0].end)
     }
+
+    // MARK: - Fetch Running Returns Most Recent
+
+    func testFetchRunningReturnsMostRecentWhenMultiple() throws {
+        let older = TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 9)
+        )
+        let newer = TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 10)
+        )
+
+        try repository.insertRunning(entry: older)
+        try repository.insertRunning(entry: newer)
+
+        let running = try repository.fetchRunning()
+        XCTAssertEqual(running?.id, newer.id)
+    }
+
+    // MARK: - Fetch Entries Ordering
+
+    func testFetchEntriesOrdersByStartDescending() throws {
+        let early = TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 9),
+            end: Date.from(year: 2024, month: 1, day: 1, hour: 10)
+        )
+        let late = TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 14),
+            end: Date.from(year: 2024, month: 1, day: 1, hour: 15)
+        )
+
+        try repository.insertRunning(entry: early)
+        try repository.insertRunning(entry: late)
+
+        let rangeStart = Date.from(year: 2024, month: 1, day: 1)
+        let rangeEnd = Date.from(year: 2024, month: 1, day: 2)
+
+        let fetched = try repository.fetchEntries(in: rangeStart..<rangeEnd)
+
+        XCTAssertEqual(fetched.count, 2)
+        XCTAssertEqual(fetched[0].id, late.id)
+        XCTAssertEqual(fetched[1].id, early.id)
+    }
+
+    // MARK: - Delete Non-Existent
+
+    func testDeleteNonExistentDoesNotThrow() throws {
+        XCTAssertNoThrow(try repository.delete(id: "non-existent-id"))
+    }
+
+    // MARK: - Empty Database
+
+    func testFetchRunningOnEmptyDatabase() throws {
+        let running = try repository.fetchRunning()
+        XCTAssertNil(running)
+    }
+
+    func testFetchEntriesOnEmptyDatabase() throws {
+        let rangeStart = Date.from(year: 2024, month: 1, day: 1)
+        let rangeEnd = Date.from(year: 2024, month: 1, day: 2)
+
+        let fetched = try repository.fetchEntries(in: rangeStart..<rangeEnd)
+        XCTAssertTrue(fetched.isEmpty)
+    }
+
+    func testResolveMultipleRunningOnEmptyDatabase() throws {
+        XCTAssertNoThrow(try repository.resolveMultipleRunningEntries())
+    }
 }

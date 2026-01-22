@@ -96,4 +96,73 @@ final class ProjectRepositoryTests: XCTestCase {
         XCTAssertEqual(fetched[0].name, "older")
         XCTAssertEqual(fetched[1].name, "newer")
     }
+
+    // MARK: - Empty Database
+
+    func testFetchAllOnEmptyDatabase() throws {
+        let fetched = try repository.fetchAll()
+        XCTAssertTrue(fetched.isEmpty)
+    }
+
+    func testFetchAllActiveOnEmptyDatabase() throws {
+        let fetched = try repository.fetchAllActive()
+        XCTAssertTrue(fetched.isEmpty)
+    }
+
+    // MARK: - Archive Non-Existent
+
+    func testArchiveNonExistentProjectDoesNotThrow() throws {
+        XCTAssertNoThrow(try repository.archive(projectId: "non-existent-id"))
+    }
+
+    // MARK: - Multiple Projects
+
+    func testInsertMultipleProjects() throws {
+        let project1 = Project(name: "project 1")
+        let project2 = Project(name: "project 2")
+        let project3 = Project(name: "project 3")
+
+        try repository.insert(project1)
+        try repository.insert(project2)
+        try repository.insert(project3)
+
+        let fetched = try repository.fetchAll()
+        XCTAssertEqual(fetched.count, 3)
+    }
+
+    func testFetchAllActiveOrdersByCreatedAt() throws {
+        let older = Project(
+            name: "older",
+            createdAt: Date.from(year: 2024, month: 1, day: 1)
+        )
+        let newer = Project(
+            name: "newer",
+            createdAt: Date.from(year: 2024, month: 1, day: 2)
+        )
+
+        try repository.insert(newer)
+        try repository.insert(older)
+
+        let fetched = try repository.fetchAllActive()
+        XCTAssertEqual(fetched[0].name, "older")
+        XCTAssertEqual(fetched[1].name, "newer")
+    }
+
+    // MARK: - Ensure Default With Archived Only
+
+    func testEnsureDefaultProjectCreatesWhenOnlyArchivedExist() throws {
+        let archived = Project(name: "archived", archived: true)
+        try repository.insert(archived)
+
+        let project = try repository.ensureDefaultProject()
+
+        XCTAssertEqual(project.name, "default")
+
+        let all = try repository.fetchAll()
+        XCTAssertEqual(all.count, 2)
+
+        let active = try repository.fetchAllActive()
+        XCTAssertEqual(active.count, 1)
+        XCTAssertEqual(active[0].name, "default")
+    }
 }
