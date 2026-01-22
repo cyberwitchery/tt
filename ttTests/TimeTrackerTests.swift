@@ -283,11 +283,11 @@ final class TimeTrackerTests: XCTestCase {
         try tracker.loadInitialState()
         try tracker.startTimer()
 
-        let now = tracker.runningEntry!.start.addingTimeInterval(300)
+        let now = tracker.runningEntry!.start.addingTimeInterval(42)
         tracker.refreshReports(now: now)
 
         XCTAssertEqual(tracker.dailyTotals.count, 1)
-        XCTAssertEqual(tracker.dailyTotals[0].seconds, 300)
+        XCTAssertEqual(tracker.dailyTotals[0].seconds, 42)
     }
 
     func testWeeklyTotalsAfterWork() throws {
