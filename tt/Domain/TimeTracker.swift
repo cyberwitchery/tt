@@ -93,12 +93,16 @@ final class TimeTracker {
     }
 
     // MARK: - Entry Management
+    
+    func getEntry(id: String) throws -> TimeEntry? {
+        return try timeEntryRepository.get(id: id)
+    }
 
     func updateEntry(id: String, start: Date, end: Date?, note: String?) throws {
         let sanitizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedEnd = end.map { max($0, start) }
 
-        guard var entry = todaysEntries.first(where: { $0.id == id }) else { return }
+        guard var entry = try timeEntryRepository.get(id: id) else { return }
         entry.start = start
         entry.end = normalizedEnd
         entry.note = sanitizedNote?.isEmpty == true ? nil : sanitizedNote

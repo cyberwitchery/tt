@@ -23,6 +23,14 @@ final class TimeEntryRepository {
         return updated
     }
 
+    func get(id: String) throws -> TimeEntry? {
+        try dbQueue.read { db in
+            try TimeEntry
+                .filter(Column("id") == id)
+                .fetchOne(db)
+        }
+    }
+
     func update(_ entry: TimeEntry) throws {
         try dbQueue.write { db in
             try entry.update(db)

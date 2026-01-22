@@ -217,7 +217,8 @@ final class TimeTrackerTests: XCTestCase {
 
         try tracker.updateEntry(id: entryId, start: newStart, end: newEnd, note: "updated")
 
-        let entry = tracker.todaysEntries.first(where: { $0.id == entryId })
+        let entry = try tracker.getEntry(id: entryId)
+        XCTAssertEqual(entry?.id, entryId)
         XCTAssertEqual(entry?.start, newStart)
         XCTAssertEqual(entry?.end, newEnd)
         XCTAssertEqual(entry?.note, "updated")
@@ -233,7 +234,7 @@ final class TimeTrackerTests: XCTestCase {
 
         try tracker.updateEntry(id: entryId, start: start, end: endBeforeStart, note: nil)
 
-        let entry = tracker.todaysEntries.first(where: { $0.id == entryId })
+        let entry = try tracker.getEntry(id: entryId)
         XCTAssertEqual(entry?.end, start)
     }
 
@@ -282,11 +283,11 @@ final class TimeTrackerTests: XCTestCase {
         try tracker.loadInitialState()
         try tracker.startTimer()
 
-        let now = tracker.runningEntry!.start.addingTimeInterval(3600)
+        let now = tracker.runningEntry!.start.addingTimeInterval(300)
         tracker.refreshReports(now: now)
 
         XCTAssertEqual(tracker.dailyTotals.count, 1)
-        XCTAssertEqual(tracker.dailyTotals[0].seconds, 3600)
+        XCTAssertEqual(tracker.dailyTotals[0].seconds, 300)
     }
 
     func testWeeklyTotalsAfterWork() throws {
