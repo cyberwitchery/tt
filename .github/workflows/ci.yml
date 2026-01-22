@@ -28,13 +28,44 @@ jobs:
             -resultBundlePath TestResults.xcresult \
             test
 
-      - name: Check coverage threshold
+      - name: Check coverage threshold (logic layer only)
         run: |
-          # Get coverage as JSON for reliable parsing
+          # Calculate coverage for Domain and Persistence only (excludes UI, AppDelegate, etc.)
           COVERAGE=$(xcrun xccov view --report --json TestResults.xcresult | \
-            python3 -c "import sys, json; data = json.load(sys.stdin); print(f\"{data['lineCoverage'] * 100:.1f}\")")
+            python3 -c "
+          import sys, json
 
-          echo "Coverage: ${COVERAGE}%"
+          data = json.load(sys.stdin)
+          covered = 0
+          total = 0
+
+          # Only count files in Domain/ or Persistence/
+          for target in data.get('targets', []):
+              for file in target.get('files', []):
+                  path = file.get('path', '')
+                  if '/Domain/' in path or '/Persistence/' in path:
+                      covered += file.get('coveredLines', 0)
+                      total += file.get('lineCoverage', 0) * file.get('executableLines', 1) if file.get('executableLines', 0) > 0 else 0
+                      total = file.get('executableLines', 0)
+                      covered = file.get('coveredLines', 0)
+
+          # Recalculate properly
+          covered_total = 0
+          exec_total = 0
+          for target in data.get('targets', []):
+              for file in target.get('files', []):
+                  path = file.get('path', '')
+                  if '/Domain/' in path or '/Persistence/' in path:
+                      covered_total += file.get('coveredLines', 0)
+                      exec_total += file.get('executableLines', 0)
+
+          if exec_total > 0:
+              print(f'{(covered_total / exec_total) * 100:.1f}')
+          else:
+              print('0.0')
+          ")
+
+          echo "Logic layer coverage: ${COVERAGE}%"
           echo "Minimum: ${MIN_COVERAGE}%"
 
           if (( $(echo "$COVERAGE < $MIN_COVERAGE" | bc -l) )); then
@@ -43,3 +74,15 @@ jobs:
           fi
 
           echo "Coverage check passed"
+
+  ui-tests:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run UI tests
+        run: |
+          xcodebuild -scheme tt \
+            -destination 'platform=macOS' \
+            -only-testing:ttUITests \
+            test

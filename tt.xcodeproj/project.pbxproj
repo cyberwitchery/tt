@@ -32,10 +32,20 @@
 		A10000000000000000000052 /* TimeEntryRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000053 /* TimeEntryRepositoryTests.swift */; };
 		A10000000000000000000054 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000055 /* ModelTests.swift */; };
 		A10000000000000000000057 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000058 /* AppStateTests.swift */; };
+		A10000000000000000000059 /* TimeTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000005A /* TimeTracker.swift */; };
+		A1000000000000000000005B /* TimeTrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000005C /* TimeTrackerTests.swift */; };
+		A1000000000000000000005D /* ttUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000005E /* ttUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		A10000000000000000000050 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000035 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10000000000000000000030 /* tt */;
+			remoteInfo = tt;
+		};
+		A10000000000000000000064 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A10000000000000000000035 /* Project object */;
 			proxyType = 1;
@@ -49,6 +59,11 @@
 			isa = PBXTargetDependency;
 			target = A10000000000000000000030 /* tt */;
 			targetProxy = A10000000000000000000050 /* PBXContainerItemProxy */;
+		};
+		A10000000000000000000065 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000000000000000000030 /* tt */;
+			targetProxy = A10000000000000000000064 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -80,6 +95,10 @@
 		A10000000000000000000053 /* TimeEntryRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeEntryRepositoryTests.swift; sourceTree = "<group>"; };
 		A10000000000000000000055 /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
 		A10000000000000000000058 /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
+		A1000000000000000000005A /* TimeTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTracker.swift; sourceTree = "<group>"; };
+		A1000000000000000000005C /* TimeTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTrackerTests.swift; sourceTree = "<group>"; };
+		A1000000000000000000005E /* ttUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ttUITests.swift; sourceTree = "<group>"; };
+		A1000000000000000000005F /* ttUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = ttUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -98,6 +117,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A10000000000000000000061 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -106,6 +132,7 @@
 			children = (
 				A10000000000000000000026 /* tt */,
 				A10000000000000000000027 /* ttTests */,
+				A10000000000000000000060 /* ttUITests */,
 				A10000000000000000000024 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -115,8 +142,17 @@
 			children = (
 				A10000000000000000000010 /* tt.app */,
 				A1000000000000000000001F /* ttTests.xctest */,
+				A1000000000000000000005F /* ttUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000060 /* ttUITests */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000005E /* ttUITests.swift */,
+			);
+			path = ttUITests;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000026 /* tt */ = {
@@ -145,6 +181,7 @@
 				A10000000000000000000053 /* TimeEntryRepositoryTests.swift */,
 				A10000000000000000000055 /* ModelTests.swift */,
 				A10000000000000000000058 /* AppStateTests.swift */,
+				A1000000000000000000005C /* TimeTrackerTests.swift */,
 			);
 			path = ttTests;
 			sourceTree = "<group>";
@@ -164,6 +201,7 @@
 				A10000000000000000000015 /* TimeMath.swift */,
 				A10000000000000000000044 /* Reports.swift */,
 				A10000000000000000000046 /* CSVExporter.swift */,
+				A1000000000000000000005A /* TimeTracker.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -254,6 +292,23 @@
 			productReference = A1000000000000000000001F /* ttTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		A10000000000000000000063 /* ttUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A10000000000000000000068 /* Build configuration list for PBXNativeTarget "ttUITests" */;
+			buildPhases = (
+				A10000000000000000000062 /* Sources */,
+				A10000000000000000000061 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A10000000000000000000065 /* PBXTargetDependency */,
+			);
+			name = ttUITests;
+			productName = ttUITests;
+			productReference = A1000000000000000000005F /* ttUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -268,6 +323,11 @@
 					};
 					A10000000000000000000033 = {
 						CreatedOnToolsVersion = 15.0;
+						TestTargetID = A10000000000000000000030;
+					};
+					A10000000000000000000063 = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = A10000000000000000000030;
 					};
 				};
 			};
@@ -288,6 +348,7 @@
 			targets = (
 				A10000000000000000000030 /* tt */,
 				A10000000000000000000033 /* ttTests */,
+				A10000000000000000000063 /* ttUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -323,6 +384,7 @@
 				A1000000000000000000004C /* BrutalistPicker.swift in Sources */,
 				A1000000000000000000000B /* StatusPopoverView.swift in Sources */,
 				A10000000000000000000041 /* MainWindowView.swift in Sources */,
+				A10000000000000000000059 /* TimeTracker.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -338,6 +400,15 @@
 				A10000000000000000000052 /* TimeEntryRepositoryTests.swift in Sources */,
 				A10000000000000000000054 /* ModelTests.swift in Sources */,
 				A10000000000000000000057 /* AppStateTests.swift in Sources */,
+				A1000000000000000000005B /* TimeTrackerTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A10000000000000000000062 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000000000000000000005D /* ttUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -439,6 +510,32 @@
 			};
 			name = Release;
 		};
+		A10000000000000000000066 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cyberwitchery.tt.uitests;
+				PRODUCT_NAME = ttUITests;
+				SWIFT_VERSION = 5.9;
+				TEST_TARGET_NAME = tt;
+			};
+			name = Debug;
+		};
+		A10000000000000000000067 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cyberwitchery.tt.uitests;
+				PRODUCT_NAME = ttUITests;
+				SWIFT_VERSION = 5.9;
+				TEST_TARGET_NAME = tt;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -465,6 +562,15 @@
 			buildConfigurations = (
 				A1000000000000000000003F /* Debug */,
 				A10000000000000000000040 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A10000000000000000000068 /* Build configuration list for PBXNativeTarget "ttUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000000066 /* Debug */,
+				A10000000000000000000067 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

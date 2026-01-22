@@ -2,8 +2,11 @@ import Foundation
 import Combine
 
 @MainActor
-final class AppState: ObservableObject {
+final class AppState: ObservableObject, TimeTrackerDelegate {
     static let shared = AppState()
+
+    private let tracker: TimeTracker
+    private var timer: Timer?
 
     @Published private(set) var projects: [Project] = []
     @Published private(set) var runningEntry: TimeEntry?
@@ -13,24 +16,43 @@ final class AppState: ObservableObject {
     @Published var selectedProjectId: String?
     @Published var elapsedSeconds: Int = 0
 
-    private let projectRepository = ProjectRepository()
-    private let timeEntryRepository = TimeEntryRepository()
-    private var timer: Timer?
-
     private init() {
+        let projectRepository = ProjectRepository()
+        let timeEntryRepository = TimeEntryRepository()
+        self.tracker = TimeTracker(
+            projectRepository: projectRepository,
+            timeEntryRepository: timeEntryRepository
+        )
+        tracker.delegate = self
         Task { await loadInitialState() }
+    }
+
+    // For testing only
+    init(tracker: TimeTracker) {
+        self.tracker = tracker
+        tracker.delegate = self
+    }
+
+    nonisolated func timeTrackerDidUpdate() {
+        Task { @MainActor in
+            syncFromTracker()
+        }
+    }
+
+    private func syncFromTracker() {
+        projects = tracker.projects
+        runningEntry = tracker.runningEntry
+        todaysEntries = tracker.todaysEntries
+        dailyTotals = tracker.dailyTotals
+        weeklyTotals = tracker.weeklyTotals
+        selectedProjectId = tracker.selectedProjectId
+        updateElapsed()
     }
 
     func loadInitialState() async {
         do {
-            try timeEntryRepository.resolveMultipleRunningEntries()
-            let defaultProject = try projectRepository.ensureDefaultProject()
-            projects = try projectRepository.fetchAllActive()
-            selectedProjectId = defaultProject.id
-            runningEntry = try timeEntryRepository.fetchRunning()
-            todaysEntries = try timeEntryRepository.fetchEntriesForToday()
-            refreshReports()
-            updateElapsed()
+            try tracker.loadInitialState()
+            syncFromTracker()
             restartTimerIfNeeded()
         } catch {
             projects = []
@@ -42,15 +64,9 @@ final class AppState: ObservableObject {
     }
 
     func startTimer() {
-        guard runningEntry == nil else { return }
-        guard let projectId = selectedProjectId else { return }
-
-        let entry = TimeEntry(projectId: projectId, start: Date())
         do {
-            try timeEntryRepository.insertRunning(entry: entry)
-            runningEntry = entry
-            refreshTodaysEntries()
-            refreshReports()
+            try tracker.startTimer()
+            syncFromTracker()
             restartTimerIfNeeded()
         } catch {
             return
@@ -58,30 +74,25 @@ final class AppState: ObservableObject {
     }
 
     func stopTimer() {
-        guard let entry = runningEntry else { return }
         do {
-            _ = try timeEntryRepository.stopRunning(entry: entry, end: Date())
-            runningEntry = nil
+            try tracker.stopTimer()
+            syncFromTracker()
             stopTimerUpdates()
             elapsedSeconds = 0
-            refreshTodaysEntries()
-            refreshReports()
         } catch {
             return
         }
     }
 
     func selectProject(id: String) {
+        tracker.selectProject(id: id)
         selectedProjectId = id
     }
 
     func createProject(name: String) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-
         do {
-            try projectRepository.insert(Project(name: trimmed.lowercased()))
-            refreshProjects(keepSelection: true)
+            try tracker.createProject(name: name)
+            syncFromTracker()
         } catch {
             return
         }
@@ -89,8 +100,8 @@ final class AppState: ObservableObject {
 
     func archiveProject(id: String) {
         do {
-            try projectRepository.archive(projectId: id)
-            refreshProjects(keepSelection: false)
+            try tracker.archiveProject(id: id)
+            syncFromTracker()
         } catch {
             return
         }
@@ -112,36 +123,18 @@ final class AppState: ObservableObject {
     }
 
     private func updateElapsed() {
-        guard let entry = runningEntry else {
-            elapsedSeconds = 0
-            return
-        }
-        elapsedSeconds = TimeMath.durationSeconds(start: entry.start, end: entry.end)
+        elapsedSeconds = tracker.elapsedSeconds()
     }
 
     func refreshTodaysEntries() {
-        do {
-            todaysEntries = try timeEntryRepository.fetchEntriesForToday()
-        } catch {
-            todaysEntries = []
-        }
+        tracker.refreshTodaysEntries()
+        syncFromTracker()
     }
 
     func updateEntry(id: String, start: Date, end: Date?, note: String?) {
-        let sanitizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedEnd = end.map { max($0, start) }
-
         do {
-            guard var entry = todaysEntries.first(where: { $0.id == id }) else { return }
-            entry.start = start
-            entry.end = normalizedEnd
-            entry.note = sanitizedNote?.isEmpty == true ? nil : sanitizedNote
-            try timeEntryRepository.update(entry)
-            try timeEntryRepository.resolveMultipleRunningEntries()
-            runningEntry = try timeEntryRepository.fetchRunning()
-            refreshTodaysEntries()
-            refreshReports()
-            updateElapsed()
+            try tracker.updateEntry(id: id, start: start, end: end, note: note)
+            syncFromTracker()
             restartTimerIfNeeded()
         } catch {
             return
@@ -150,11 +143,8 @@ final class AppState: ObservableObject {
 
     func deleteEntry(id: String) {
         do {
-            try timeEntryRepository.delete(id: id)
-            runningEntry = try timeEntryRepository.fetchRunning()
-            refreshTodaysEntries()
-            refreshReports()
-            updateElapsed()
+            try tracker.deleteEntry(id: id)
+            syncFromTracker()
             restartTimerIfNeeded()
         } catch {
             return
@@ -162,61 +152,21 @@ final class AppState: ObservableObject {
     }
 
     func refreshProjects(keepSelection: Bool) {
-        do {
-            projects = try projectRepository.fetchAllActive()
-            if keepSelection {
-                return
-            }
-            if let selectedProjectId, projects.contains(where: { $0.id == selectedProjectId }) {
-                return
-            }
-            selectedProjectId = projects.first?.id
-        } catch {
-            projects = []
-        }
-        refreshReports()
+        tracker.refreshProjects(keepSelection: keepSelection)
+        syncFromTracker()
     }
 
     func projectName(for projectId: String) -> String {
-        projects.first(where: { $0.id == projectId })?.name.lowercased() ?? "unknown"
+        tracker.projectName(for: projectId)
     }
 
     func refreshReports(now: Date = Date(), calendar: Calendar = .current) {
-        do {
-            let startOfDay = calendar.startOfDay(for: now)
-            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? now
-            let weekStart = calendar.date(byAdding: .day, value: -6, to: startOfDay) ?? startOfDay
-            let weekEnd = endOfDay
-
-            let dailyEntries = try timeEntryRepository.fetchEntries(in: startOfDay..<endOfDay)
-            let weeklyEntries = try timeEntryRepository.fetchEntries(in: weekStart..<weekEnd)
-
-            dailyTotals = ReportBuilder.dailyTotals(
-                entries: dailyEntries,
-                rangeStart: startOfDay,
-                rangeEnd: endOfDay,
-                now: now,
-                projectNameForId: { projectName(for: $0) }
-            )
-            weeklyTotals = ReportBuilder.weeklyTotals(
-                entries: weeklyEntries,
-                weekStart: weekStart,
-                now: now,
-                calendar: calendar
-            )
-        } catch {
-            dailyTotals = []
-            weeklyTotals = []
-        }
+        tracker.refreshReports(now: now, calendar: calendar)
+        syncFromTracker()
     }
 
     func exportCSV(range: Range<Date>, to url: URL, now: Date = Date()) throws {
-        let entries = try timeEntryRepository.fetchEntries(in: range)
-        let projects = try projectRepository.fetchAll()
-        let projectNames = Dictionary(uniqueKeysWithValues: projects.map { ($0.id, $0.name.lowercased()) })
-
-        let output = CSVExporter.buildCSV(entries: entries, projectNames: projectNames, now: now)
-        try output.write(to: url, atomically: true, encoding: .utf8)
+        try tracker.exportCSV(range: range, to: url, now: now)
     }
 }
 

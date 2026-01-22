@@ -1,39 +1,21 @@
 import XCTest
 @testable import tt
 
+// AppState is now a thin UI wrapper around TimeTracker.
+// Core business logic is tested in TimeTrackerTests.
+// These tests verify the wrapper properly delegates to TimeTracker.
+
 final class AppStateTests: XCTestCase {
-    // MARK: - ProjectName Lookup
-
-    func testProjectNameReturnsUnknownForMissingProject() async {
-        let appState = await AppState.shared
-        let name = await appState.projectName(for: "nonexistent-id")
-        XCTAssertEqual(name, "unknown")
-    }
-
-    // MARK: - Selection
-
-    func testSelectProject() async {
+    func testSelectProjectUpdatesState() async {
         let appState = await AppState.shared
         await appState.selectProject(id: "test-id")
         let selected = await appState.selectedProjectId
         XCTAssertEqual(selected, "test-id")
     }
 
-    // MARK: - Create Project with Empty Name
-
-    func testCreateProjectIgnoresEmptyName() async {
+    func testProjectNameDelegatesToTracker() async {
         let appState = await AppState.shared
-        let initialCount = await appState.projects.count
-        await appState.createProject(name: "   ")
-        let finalCount = await appState.projects.count
-        XCTAssertEqual(initialCount, finalCount)
-    }
-
-    func testCreateProjectIgnoresWhitespaceOnlyName() async {
-        let appState = await AppState.shared
-        let initialCount = await appState.projects.count
-        await appState.createProject(name: "\t\n  ")
-        let finalCount = await appState.projects.count
-        XCTAssertEqual(initialCount, finalCount)
+        let name = await appState.projectName(for: "nonexistent-id")
+        XCTAssertEqual(name, "unknown")
     }
 }
