@@ -15,9 +15,10 @@ final class ModelTests: XCTestCase {
 
     func testProjectEquality() {
         let id = "same-id"
-        let project1 = Project(id: id, name: "test")
-        let project2 = Project(id: id, name: "test")
-        let project3 = Project(id: "different", name: "test")
+        let createdAt = Date()
+        let project1 = Project(id: id, name: "test", createdAt: createdAt)
+        let project2 = Project(id: id, name: "test", createdAt: createdAt)
+        let project3 = Project(id: "different", name: "test", createdAt: createdAt)
 
         XCTAssertEqual(project1, project2)
         XCTAssertNotEqual(project1, project3)
