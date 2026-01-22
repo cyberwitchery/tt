@@ -27,6 +27,11 @@
 		A10000000000000000000047 /* ReportBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* ReportBuilderTests.swift */; };
 		A10000000000000000000049 /* CSVExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000004A /* CSVExporterTests.swift */; };
 		A1000000000000000000004C /* BrutalistPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000004B /* BrutalistPicker.swift */; };
+		A1000000000000000000004D /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000004E /* TestHelpers.swift */; };
+		A1000000000000000000004F /* ProjectRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000056 /* ProjectRepositoryTests.swift */; };
+		A10000000000000000000052 /* TimeEntryRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000053 /* TimeEntryRepositoryTests.swift */; };
+		A10000000000000000000054 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000055 /* ModelTests.swift */; };
+		A10000000000000000000057 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000058 /* AppStateTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +75,11 @@
 		A1000000000000000000001E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1000000000000000000001F /* ttTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = ttTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000000000000000000004B /* BrutalistPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrutalistPicker.swift; sourceTree = "<group>"; };
+		A1000000000000000000004E /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
+		A10000000000000000000056 /* ProjectRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRepositoryTests.swift; sourceTree = "<group>"; };
+		A10000000000000000000053 /* TimeEntryRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeEntryRepositoryTests.swift; sourceTree = "<group>"; };
+		A10000000000000000000055 /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
+		A10000000000000000000058 /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -127,9 +137,14 @@
 		A10000000000000000000027 /* ttTests */ = {
 			isa = PBXGroup;
 			children = (
+				A1000000000000000000004E /* TestHelpers.swift */,
 				A1000000000000000000001D /* TimeMathTests.swift */,
 				A10000000000000000000048 /* ReportBuilderTests.swift */,
 				A1000000000000000000004A /* CSVExporterTests.swift */,
+				A10000000000000000000056 /* ProjectRepositoryTests.swift */,
+				A10000000000000000000053 /* TimeEntryRepositoryTests.swift */,
+				A10000000000000000000055 /* ModelTests.swift */,
+				A10000000000000000000058 /* AppStateTests.swift */,
 			);
 			path = ttTests;
 			sourceTree = "<group>";
@@ -315,9 +330,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1000000000000000000004D /* TestHelpers.swift in Sources */,
 				A1000000000000000000000D /* TimeMathTests.swift in Sources */,
 				A10000000000000000000047 /* ReportBuilderTests.swift in Sources */,
 				A10000000000000000000049 /* CSVExporterTests.swift in Sources */,
+				A1000000000000000000004F /* ProjectRepositoryTests.swift in Sources */,
+				A10000000000000000000052 /* TimeEntryRepositoryTests.swift in Sources */,
+				A10000000000000000000054 /* ModelTests.swift in Sources */,
+				A10000000000000000000057 /* AppStateTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

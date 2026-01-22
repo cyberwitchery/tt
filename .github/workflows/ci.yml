@@ -4,10 +4,44 @@ on:
   push:
   pull_request:
 
+env:
+  MIN_COVERAGE: 80
+
 jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: xcodebuild -scheme tt -destination 'platform=macOS' build
+
   tests:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run tests
-        run: xcodebuild -scheme ttTests test
+
+      - name: Run tests with coverage
+        run: |
+          xcodebuild -scheme tt \
+            -destination 'platform=macOS' \
+            -enableCodeCoverage YES \
+            -resultBundlePath TestResults.xcresult \
+            test
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(xcrun xccov view --report --only-targets TestResults.xcresult | \
+            grep 'tt.app' | \
+            head -1 | \
+            awk '{print $NF}' | \
+            sed 's/%//')
+
+          echo "Coverage: ${COVERAGE}%"
+          echo "Minimum: ${MIN_COVERAGE}%"
+
+          if (( $(echo "$COVERAGE < $MIN_COVERAGE" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% is below minimum threshold of ${MIN_COVERAGE}%"
+            exit 1
+          fi
+
+          echo "Coverage check passed"
