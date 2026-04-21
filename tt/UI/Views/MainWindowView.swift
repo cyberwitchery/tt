@@ -115,7 +115,7 @@ struct MainWindowView: View {
         case 53: // Esc — close open editor/picker/confirm, in priority order
             if editingEntryId != nil { clearEdit(); return nil }
             if editProjectPickerOpen { editProjectPickerOpen = false; return nil }
-            if projectPickerOpen { projectPickerOpen = false; return nil }
+            if projectPickerOpen { startAfterProjectPick = false; projectPickerOpen = false; return nil }
             if confirmingStop { confirmingStop = false; return nil }
             if confirmingArchiveId != nil { confirmingArchiveId = nil; return nil }
             if addingProject { cancelAddProject(); return nil }
