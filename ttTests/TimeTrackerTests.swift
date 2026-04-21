@@ -281,10 +281,15 @@ final class TimeTrackerTests: XCTestCase {
 
     func testDailyTotalsAfterWork() throws {
         try tracker.loadInitialState()
-        try tracker.startTimer()
+        let projectId = tracker.projects[0].id
+        let start = Date.from(year: 2024, month: 6, day: 15, hour: 14, minute: 0)
+        let entry = TimeEntry(projectId: projectId, start: start)
+        try timeEntryRepository.insertRunning(entry: entry)
 
-        let now = tracker.runningEntry!.start.addingTimeInterval(42)
-        tracker.refreshReports(now: now)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = start.addingTimeInterval(42)
+        tracker.refreshReports(now: now, calendar: calendar)
 
         XCTAssertEqual(tracker.dailyTotals.count, 1)
         XCTAssertEqual(tracker.dailyTotals[0].seconds, 42)
