@@ -47,6 +47,80 @@ final class TimeEntryRepositoryTests: XCTestCase {
         XCTAssertNil(running)
     }
 
+    // MARK: - fetchAll / fetchCompletedTotalsByProject / fetchMostRecentlyEnded
+
+    func testFetchAllReturnsEveryEntryOrderedByStartDesc() throws {
+        let e1 = TimeEntry(projectId: "p1", start: Date.from(year: 2024, month: 1, day: 1, hour: 9),
+                           end: Date.from(year: 2024, month: 1, day: 1, hour: 10))
+        let e2 = TimeEntry(projectId: "p1", start: Date.from(year: 2024, month: 1, day: 1, hour: 11))
+        let e3 = TimeEntry(projectId: "p2", start: Date.from(year: 2024, month: 1, day: 1, hour: 8),
+                           end: Date.from(year: 2024, month: 1, day: 1, hour: 9))
+
+        try repository.insertRunning(entry: e1)
+        try repository.insertRunning(entry: e2)
+        try repository.insertRunning(entry: e3)
+
+        let all = try repository.fetchAll()
+        XCTAssertEqual(all.map(\.id), [e2.id, e1.id, e3.id])
+    }
+
+    func testFetchCompletedTotalsByProjectExcludesRunning() throws {
+        try repository.insertRunning(entry: TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 9),
+            end:   Date.from(year: 2024, month: 1, day: 1, hour: 10)
+        ))
+        try repository.insertRunning(entry: TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 10, minute: 30),
+            end:   Date.from(year: 2024, month: 1, day: 1, hour: 11)
+        ))
+        // Running entry (no end) — not counted
+        try repository.insertRunning(entry: TimeEntry(
+            projectId: "p2",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 12)
+        ))
+
+        let totals = try repository.fetchCompletedTotalsByProject()
+        XCTAssertEqual(totals["p1"], 3600 + 1800)
+        XCTAssertNil(totals["p2"])
+    }
+
+    func testFetchCompletedTotalsByProjectEmptyWhenNoEntries() throws {
+        let totals = try repository.fetchCompletedTotalsByProject()
+        XCTAssertTrue(totals.isEmpty)
+    }
+
+    func testFetchMostRecentlyEndedReturnsLatestByEnd() throws {
+        try repository.insertRunning(entry: TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 9),
+            end:   Date.from(year: 2024, month: 1, day: 1, hour: 10)
+        ))
+        try repository.insertRunning(entry: TimeEntry(
+            projectId: "p2",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 8),
+            end:   Date.from(year: 2024, month: 1, day: 1, hour: 11) // latest end
+        ))
+        // Running — no end, should be ignored.
+        try repository.insertRunning(entry: TimeEntry(
+            projectId: "p3",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 12)
+        ))
+
+        let latest = try repository.fetchMostRecentlyEnded()
+        XCTAssertNotNil(latest)
+        XCTAssertEqual(latest?.projectId, "p2")
+    }
+
+    func testFetchMostRecentlyEndedReturnsNilWhenNothingEnded() throws {
+        try repository.insertRunning(entry: TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 9)
+        ))
+        XCTAssertNil(try repository.fetchMostRecentlyEnded())
+    }
+
     // MARK: - Stop Running
 
     func testStopRunning() throws {

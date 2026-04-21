@@ -43,6 +43,15 @@ final class TimeEntryRepository {
         }
     }
 
+    func fetchMostRecentlyEnded() throws -> TimeEntry? {
+        try dbQueue.read { db in
+            try TimeEntry
+                .filter(Column("end") != nil)
+                .order(Column("end").desc)
+                .fetchOne(db)
+        }
+    }
+
     func fetchRunning() throws -> TimeEntry? {
         try dbQueue.read { db in
             try TimeEntry
@@ -57,6 +66,28 @@ final class TimeEntryRepository {
         let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? Date()
 
         return try fetchEntries(in: startOfDay..<endOfDay)
+    }
+
+    func fetchAll() throws -> [TimeEntry] {
+        try dbQueue.read { db in
+            try TimeEntry
+                .order(Column("start").desc)
+                .fetchAll(db)
+        }
+    }
+
+    func fetchCompletedTotalsByProject() throws -> [String: Int] {
+        let entries = try dbQueue.read { db in
+            try TimeEntry
+                .filter(Column("end") != nil)
+                .fetchAll(db)
+        }
+        var totals: [String: Int] = [:]
+        for entry in entries {
+            guard let end = entry.end else { continue }
+            totals[entry.projectId, default: 0] += TimeMath.durationSeconds(start: entry.start, end: end)
+        }
+        return totals
     }
 
     func fetchEntries(in range: Range<Date>) throws -> [TimeEntry] {

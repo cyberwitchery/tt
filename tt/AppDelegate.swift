@@ -1,6 +1,14 @@
 import Cocoa
 import SwiftUI
 
+// Borderless, non-activating menu-bar popover panel. Overriding `canBecomeKey`
+// so SwiftUI `Button` taps fire reliably inside the popover — without the
+// override a borderless panel can't become key and `Button` actions are flaky.
+final class StatusPopoverPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var panel: NSPanel?
@@ -8,8 +16,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var allowTerminate = false
     private var eventMonitor: Any?
     private var localEventMonitor: Any?
-    private var titleAccessory: NSTitlebarAccessoryViewController?
-
     func applicationDidFinishLaunching(_ notification: Notification) {
         let appState = AppState.shared
 
@@ -75,22 +81,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.titlebarSeparatorStyle = .none
             window.styleMask.insert(.fullSizeContentView)
             window.isReleasedWhenClosed = false
+            window.backgroundColor = NSColor(red: 0x0a/255.0, green: 0x0a/255.0, blue: 0x0a/255.0, alpha: 1.0)
             window.contentViewController = hostingController
             window.setContentSize(NSSize(width: 400, height: 610))
             window.initialFirstResponder = nil
-            if titleAccessory == nil {
-                let container = NSView(frame: NSRect(x: 0, y: 0, width: 120, height: 24))
-                let label = NSTextField(labelWithString: "tt")
-                label.frame = NSRect(x: 0, y: 4, width: 120, height: 16)
-                label.font = NSFont.monospacedSystemFont(ofSize: 14, weight: .bold)
-                label.textColor = NSColor.labelColor
-                label.alignment = .left
-                container.addSubview(label)
-                let accessory = NSTitlebarAccessoryViewController()
-                accessory.view = container
-                accessory.layoutAttribute = .leading
-                titleAccessory = accessory
-            }
             mainWindow = window
         }
 
@@ -98,9 +92,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainWindow?.makeKeyAndOrderFront(nil)
         mainWindow?.makeFirstResponder(nil)
         NSApp.activate(ignoringOtherApps: true)
-        if let mainWindow, let titleAccessory, !mainWindow.titlebarAccessoryViewControllers.contains(titleAccessory) {
-            mainWindow.addTitlebarAccessoryViewController(titleAccessory)
-        }
     }
 
     @objc private func requestQuit() {
@@ -114,8 +105,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func makePanel<Content: View>(rootView: Content) -> NSPanel {
         let hosting = NSHostingController(rootView: rootView)
-        let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 240),
+        let panel = StatusPopoverPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 180),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -152,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let y = buttonFrame.minY - panelSize.height
         panel.setFrame(NSRect(x: x, y: y, width: panelSize.width, height: panelSize.height), display: true)
 
-        panel.orderFront(nil)
+        panel.makeKeyAndOrderFront(nil)
         startEventMonitor()
     }
 

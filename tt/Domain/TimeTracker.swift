@@ -15,7 +15,17 @@ final class TimeTracker {
     private(set) var todaysEntries: [TimeEntry] = []
     private(set) var dailyTotals: [ProjectTotal] = []
     private(set) var weeklyTotals: [DayTotal] = []
+    private(set) var projectCompletedTotals: [String: Int] = [:]
+    private(set) var lastEntryEnd: Date?
     var selectedProjectId: String?
+
+    var startedAt: Date? { runningEntry?.start }
+
+    func idleSeconds(now: Date = Date()) -> Int? {
+        guard runningEntry == nil else { return nil }
+        guard let last = lastEntryEnd else { return nil }
+        return max(0, Int(now.timeIntervalSince(last).rounded(.down)))
+    }
 
     init(
         projectRepository: ProjectRepository,
@@ -98,7 +108,7 @@ final class TimeTracker {
         return try timeEntryRepository.get(id: id)
     }
 
-    func updateEntry(id: String, start: Date, end: Date?, note: String?) throws {
+    func updateEntry(id: String, start: Date, end: Date?, note: String?, projectId: String? = nil) throws {
         let sanitizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedEnd = end.map { max($0, start) }
 
@@ -106,6 +116,9 @@ final class TimeTracker {
         entry.start = start
         entry.end = normalizedEnd
         entry.note = sanitizedNote?.isEmpty == true ? nil : sanitizedNote
+        if let projectId, projects.contains(where: { $0.id == projectId }) {
+            entry.projectId = projectId
+        }
         try timeEntryRepository.update(entry)
         try timeEntryRepository.resolveMultipleRunningEntries()
         runningEntry = try timeEntryRepository.fetchRunning()
@@ -171,10 +184,23 @@ final class TimeTracker {
                 now: now,
                 calendar: calendar
             )
+            projectCompletedTotals = (try? timeEntryRepository.fetchCompletedTotalsByProject()) ?? [:]
+            lastEntryEnd = (try? timeEntryRepository.fetchMostRecentlyEnded())?.end
         } catch {
             dailyTotals = []
             weeklyTotals = []
+            projectCompletedTotals = [:]
+            lastEntryEnd = nil
         }
+    }
+
+    // All-time project total including the running entry's live contribution.
+    func projectAllTimeSeconds(for projectId: String, now: Date = Date()) -> Int {
+        var seconds = projectCompletedTotals[projectId] ?? 0
+        if let entry = runningEntry, entry.projectId == projectId {
+            seconds += TimeMath.durationSeconds(start: entry.start, end: entry.end, now: now)
+        }
+        return seconds
     }
 
     // MARK: - Export

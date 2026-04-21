@@ -26,7 +26,6 @@
 		A10000000000000000000045 /* CSVExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000046 /* CSVExporter.swift */; };
 		A10000000000000000000047 /* ReportBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* ReportBuilderTests.swift */; };
 		A10000000000000000000049 /* CSVExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000004A /* CSVExporterTests.swift */; };
-		A1000000000000000000004C /* BrutalistPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000004B /* BrutalistPicker.swift */; };
 		A1000000000000000000004D /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000004E /* TestHelpers.swift */; };
 		A1000000000000000000004F /* ProjectRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000056 /* ProjectRepositoryTests.swift */; };
 		A10000000000000000000052 /* TimeEntryRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000053 /* TimeEntryRepositoryTests.swift */; };
@@ -35,6 +34,15 @@
 		A10000000000000000000059 /* TimeTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000005A /* TimeTracker.swift */; };
 		A1000000000000000000005B /* TimeTrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000005C /* TimeTrackerTests.swift */; };
 		A1000000000000000000005D /* ttUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000005E /* ttUITests.swift */; };
+		B200000000000000000000E2 /* EntryEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000000000000000000E1 /* EntryEditor.swift */; };
+		B300000000000000000000E4 /* SurfaceStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B300000000000000000000E3 /* SurfaceStyle.swift */; };
+		B400000000000000000000E6 /* HeaderProjectPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B400000000000000000000E5 /* HeaderProjectPicker.swift */; };
+		B500000000000000000000E8 /* KeyEventCatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B500000000000000000000E7 /* KeyEventCatcher.swift */; };
+		B600000000000000000000EA /* EntryEditorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B600000000000000000000E9 /* EntryEditorTests.swift */; };
+		B700000000000000000000EC /* TrackerDerivationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B700000000000000000000EB /* TrackerDerivationsTests.swift */; };
+		B100000000000000000000F4 /* JetBrainsMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000F1 /* JetBrainsMono-Regular.ttf */; };
+		B100000000000000000000F5 /* JetBrainsMono-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000F2 /* JetBrainsMono-Medium.ttf */; };
+		B100000000000000000000F6 /* JetBrainsMono-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000F3 /* JetBrainsMono-SemiBold.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -89,7 +97,6 @@
 		A1000000000000000000004A /* CSVExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVExporterTests.swift; sourceTree = "<group>"; };
 		A1000000000000000000001E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1000000000000000000001F /* ttTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = ttTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		A1000000000000000000004B /* BrutalistPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrutalistPicker.swift; sourceTree = "<group>"; };
 		A1000000000000000000004E /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
 		A10000000000000000000056 /* ProjectRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRepositoryTests.swift; sourceTree = "<group>"; };
 		A10000000000000000000053 /* TimeEntryRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeEntryRepositoryTests.swift; sourceTree = "<group>"; };
@@ -99,6 +106,15 @@
 		A1000000000000000000005C /* TimeTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTrackerTests.swift; sourceTree = "<group>"; };
 		A1000000000000000000005E /* ttUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ttUITests.swift; sourceTree = "<group>"; };
 		A1000000000000000000005F /* ttUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = ttUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B200000000000000000000E1 /* EntryEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryEditor.swift; sourceTree = "<group>"; };
+		B300000000000000000000E3 /* SurfaceStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceStyle.swift; sourceTree = "<group>"; };
+		B400000000000000000000E5 /* HeaderProjectPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeaderProjectPicker.swift; sourceTree = "<group>"; };
+		B500000000000000000000E7 /* KeyEventCatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyEventCatcher.swift; sourceTree = "<group>"; };
+		B600000000000000000000E9 /* EntryEditorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryEditorTests.swift; sourceTree = "<group>"; };
+		B700000000000000000000EB /* TrackerDerivationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackerDerivationsTests.swift; sourceTree = "<group>"; };
+		B100000000000000000000F1 /* JetBrainsMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-Regular.ttf"; sourceTree = "<group>"; };
+		B100000000000000000000F2 /* JetBrainsMono-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-Medium.ttf"; sourceTree = "<group>"; };
+		B100000000000000000000F3 /* JetBrainsMono-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-SemiBold.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -165,9 +181,28 @@
 				A1000000000000000000002A /* Persistence */,
 				A1000000000000000000002B /* UI */,
 				A1000000000000000000002C /* SupportingFiles */,
+				B100000000000000000000F8 /* Resources */,
 				A1000000000000000000001C /* Assets.xcassets */,
 			);
 			path = tt;
+			sourceTree = "<group>";
+		};
+		B100000000000000000000F8 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				B100000000000000000000F7 /* Fonts */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		B100000000000000000000F7 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				B100000000000000000000F1 /* JetBrainsMono-Regular.ttf */,
+				B100000000000000000000F2 /* JetBrainsMono-Medium.ttf */,
+				B100000000000000000000F3 /* JetBrainsMono-SemiBold.ttf */,
+			);
+			path = Fonts;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000027 /* ttTests */ = {
@@ -182,6 +217,8 @@
 				A10000000000000000000055 /* ModelTests.swift */,
 				A10000000000000000000058 /* AppStateTests.swift */,
 				A1000000000000000000005C /* TimeTrackerTests.swift */,
+				B600000000000000000000E9 /* EntryEditorTests.swift */,
+				B700000000000000000000EB /* TrackerDerivationsTests.swift */,
 			);
 			path = ttTests;
 			sourceTree = "<group>";
@@ -202,6 +239,7 @@
 				A10000000000000000000044 /* Reports.swift */,
 				A10000000000000000000046 /* CSVExporter.swift */,
 				A1000000000000000000005A /* TimeTracker.swift */,
+				B200000000000000000000E1 /* EntryEditor.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -238,7 +276,9 @@
 			isa = PBXGroup;
 			children = (
 				A1000000000000000000001A /* SectionDivider.swift */,
-				A1000000000000000000004B /* BrutalistPicker.swift */,
+				B300000000000000000000E3 /* SurfaceStyle.swift */,
+				B400000000000000000000E5 /* HeaderProjectPicker.swift */,
+				B500000000000000000000E7 /* KeyEventCatcher.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -359,6 +399,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000000000000000000000C /* Assets.xcassets in Resources */,
+				B100000000000000000000F4 /* JetBrainsMono-Regular.ttf in Resources */,
+				B100000000000000000000F5 /* JetBrainsMono-Medium.ttf in Resources */,
+				B100000000000000000000F6 /* JetBrainsMono-SemiBold.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -381,10 +424,13 @@
 				A10000000000000000000008 /* TimeEntryRepository.swift in Sources */,
 				A10000000000000000000009 /* BrutalistTheme.swift in Sources */,
 				A1000000000000000000000A /* SectionDivider.swift in Sources */,
-				A1000000000000000000004C /* BrutalistPicker.swift in Sources */,
 				A1000000000000000000000B /* StatusPopoverView.swift in Sources */,
 				A10000000000000000000041 /* MainWindowView.swift in Sources */,
 				A10000000000000000000059 /* TimeTracker.swift in Sources */,
+				B200000000000000000000E2 /* EntryEditor.swift in Sources */,
+				B300000000000000000000E4 /* SurfaceStyle.swift in Sources */,
+				B400000000000000000000E6 /* HeaderProjectPicker.swift in Sources */,
+				B500000000000000000000E8 /* KeyEventCatcher.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -401,6 +447,8 @@
 				A10000000000000000000054 /* ModelTests.swift in Sources */,
 				A10000000000000000000057 /* AppStateTests.swift in Sources */,
 				A1000000000000000000005B /* TimeTrackerTests.swift in Sources */,
+				B600000000000000000000EA /* EntryEditorTests.swift in Sources */,
+				B700000000000000000000EC /* TrackerDerivationsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

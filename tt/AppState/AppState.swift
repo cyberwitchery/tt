@@ -7,12 +7,16 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
 
     private let tracker: TimeTracker
     private var timer: Timer?
+    private var idleTimer: Timer?
 
     @Published private(set) var projects: [Project] = []
     @Published private(set) var runningEntry: TimeEntry?
     @Published private(set) var todaysEntries: [TimeEntry] = []
     @Published private(set) var dailyTotals: [ProjectTotal] = []
     @Published private(set) var weeklyTotals: [DayTotal] = []
+    @Published private(set) var projectCompletedTotals: [String: Int] = [:]
+    @Published private(set) var startedAt: Date?
+    @Published private(set) var idleSeconds: Int?
     @Published var selectedProjectId: String?
     @Published var elapsedSeconds: Int = 0
 
@@ -45,8 +49,23 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         todaysEntries = tracker.todaysEntries
         dailyTotals = tracker.dailyTotals
         weeklyTotals = tracker.weeklyTotals
+        projectCompletedTotals = tracker.projectCompletedTotals
+        startedAt = tracker.startedAt
         selectedProjectId = tracker.selectedProjectId
         updateElapsed()
+        updateIdle()
+    }
+
+    private func updateIdle() {
+        idleSeconds = tracker.idleSeconds()
+    }
+
+    func projectAllTimeSeconds(for projectId: String) -> Int {
+        var seconds = projectCompletedTotals[projectId] ?? 0
+        if runningEntry?.projectId == projectId {
+            seconds += elapsedSeconds
+        }
+        return seconds
     }
 
     func loadInitialState() async {
@@ -54,12 +73,16 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             try tracker.loadInitialState()
             syncFromTracker()
             restartTimerIfNeeded()
+            startIdleTimer()
         } catch {
             projects = []
             runningEntry = nil
             todaysEntries = []
             dailyTotals = []
             weeklyTotals = []
+            projectCompletedTotals = [:]
+            startedAt = nil
+            idleSeconds = nil
         }
     }
 
@@ -122,6 +145,15 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         timer = nil
     }
 
+    private func startIdleTimer() {
+        idleTimer?.invalidate()
+        idleTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateIdle()
+            }
+        }
+    }
+
     private func updateElapsed() {
         elapsedSeconds = tracker.elapsedSeconds()
     }
@@ -131,9 +163,9 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         syncFromTracker()
     }
 
-    func updateEntry(id: String, start: Date, end: Date?, note: String?) {
+    func updateEntry(id: String, start: Date, end: Date?, note: String?, projectId: String? = nil) {
         do {
-            try tracker.updateEntry(id: id, start: start, end: end, note: note)
+            try tracker.updateEntry(id: id, start: start, end: end, note: note, projectId: projectId)
             syncFromTracker()
             restartTimerIfNeeded()
         } catch {
