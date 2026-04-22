@@ -84,35 +84,43 @@ struct MainWindowView: View {
 
     // MARK: - Keyboard
 
+    private enum KeyCode {
+        static let space: UInt16 = 49
+        static let n: UInt16     = 45
+        static let p: UInt16     = 35
+        static let e: UInt16     = 14
+        static let escape: UInt16 = 53
+    }
+
     private func handleKey(_ event: NSEvent) -> NSEvent? {
         let isTextFocused = event.window?.firstResponder is NSText
 
         // Esc is the only key we handle while a text field is focused.
-        if isTextFocused && event.keyCode != 53 { return event }
+        if isTextFocused && event.keyCode != KeyCode.escape { return event }
 
         switch event.keyCode {
-        case 49: // Space
+        case KeyCode.space:
             if appState.runningEntry == nil {
                 appState.startTimer()
             } else {
                 confirmingStop = true
             }
             return nil
-        case 45: // N — new entry: open picker; start timer on next selection
+        case KeyCode.n: // new entry: open picker; start timer on next selection
             if appState.runningEntry == nil {
                 startAfterProjectPick = true
                 projectPickerOpen = true
             }
             return nil
-        case 35: // P — focus project picker
+        case KeyCode.p: // focus project picker
             projectPickerOpen = true
             return nil
-        case 14: // E — edit currently running entry
+        case KeyCode.e: // edit currently running entry
             if let running = appState.runningEntry {
                 beginEdit(running)
             }
             return nil
-        case 53: // Esc — close open editor/picker/confirm, in priority order
+        case KeyCode.escape: // close open editor/picker/confirm, in priority order
             if editingEntryId != nil { clearEdit(); return nil }
             if editProjectPickerOpen { editProjectPickerOpen = false; return nil }
             if projectPickerOpen { startAfterProjectPick = false; projectPickerOpen = false; return nil }
