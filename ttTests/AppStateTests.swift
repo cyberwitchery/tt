@@ -50,7 +50,7 @@ final class AppStateErrorTests: XCTestCase {
     @MainActor
     func testLoadInitialStateSurfacesError() async {
         // Drop tables so loadInitialState fails
-        try! dbQueue.write { db in try db.drop(table: "timeEntries") }
+        try! await dbQueue.write { db in try db.drop(table: "timeEntries") }
 
         await appState.loadInitialState()
 
@@ -60,7 +60,7 @@ final class AppStateErrorTests: XCTestCase {
     @MainActor
     func testStartTimerSurfacesError() async {
         await appState.loadInitialState()
-        try! dbQueue.write { db in try db.drop(table: "timeEntries") }
+        try! await dbQueue.write { db in try db.drop(table: "timeEntries") }
 
         appState.startTimer()
 
@@ -73,7 +73,7 @@ final class AppStateErrorTests: XCTestCase {
         appState.startTimer()
         XCTAssertNil(appState.lastError)
 
-        try! dbQueue.write { db in try db.drop(table: "timeEntries") }
+        try! await dbQueue.write { db in try db.drop(table: "timeEntries") }
 
         appState.stopTimer()
 
@@ -83,7 +83,7 @@ final class AppStateErrorTests: XCTestCase {
     @MainActor
     func testCreateProjectSurfacesError() async {
         await appState.loadInitialState()
-        try! dbQueue.write { db in try db.drop(table: "projects") }
+        try! await dbQueue.write { db in try db.drop(table: "projects") }
 
         appState.createProject(name: "fail")
 
@@ -94,7 +94,7 @@ final class AppStateErrorTests: XCTestCase {
     func testArchiveProjectSurfacesError() async {
         await appState.loadInitialState()
         let projectId = appState.projects.first!.id
-        try! dbQueue.write { db in try db.drop(table: "projects") }
+        try! await dbQueue.write { db in try db.drop(table: "projects") }
 
         appState.archiveProject(id: projectId)
 
@@ -106,7 +106,7 @@ final class AppStateErrorTests: XCTestCase {
         await appState.loadInitialState()
         appState.startTimer()
         let entryId = appState.runningEntry!.id
-        try! dbQueue.write { db in try db.drop(table: "timeEntries") }
+        try! await dbQueue.write { db in try db.drop(table: "timeEntries") }
 
         appState.deleteEntry(id: entryId)
 
@@ -119,7 +119,7 @@ final class AppStateErrorTests: XCTestCase {
         appState.startTimer()
         appState.stopTimer()
         let entryId = appState.todaysEntries.first!.id
-        try! dbQueue.write { db in try db.drop(table: "timeEntries") }
+        try! await dbQueue.write { db in try db.drop(table: "timeEntries") }
 
         appState.updateEntry(id: entryId, start: Date(), end: Date(), note: nil)
 
@@ -129,7 +129,7 @@ final class AppStateErrorTests: XCTestCase {
     @MainActor
     func testDismissErrorClearsLastError() async {
         await appState.loadInitialState()
-        try! dbQueue.write { db in try db.drop(table: "timeEntries") }
+        try! await dbQueue.write { db in try db.drop(table: "timeEntries") }
         appState.startTimer()
         XCTAssertNotNil(appState.lastError)
 
