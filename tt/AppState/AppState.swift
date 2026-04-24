@@ -30,7 +30,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             timeEntryRepository: timeEntryRepository
         )
         tracker.delegate = self
-        Task { await loadInitialState() }
+        Task { self.loadInitialState() }
     }
 
     // For testing only
@@ -70,7 +70,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         return seconds
     }
 
-    func loadInitialState() async {
+    func loadInitialState() {
         do {
             try tracker.loadInitialState()
             syncFromTracker()
