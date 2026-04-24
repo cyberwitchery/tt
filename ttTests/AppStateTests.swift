@@ -23,33 +23,19 @@ final class AppStateTests: XCTestCase {
 
 // MARK: - Error Propagation
 
-/// Tests are @MainActor at the class level with synchronous setUp/tearDown.
-/// Previous iterations used `@MainActor override func setUp() async throws`
-/// which crashes Xcode's parallel test workers (each worker process dies at
-/// 0.000s before the test body runs). The fix: synchronous lifecycle methods
-/// plus synchronous test methods — `loadInitialState()` was async-in-name-only
-/// (no awaits inside), so removing the `async` keyword lets us drop the async
-/// test execution path entirely.
-@MainActor
+/// Tests run without @MainActor on the class to avoid crashes in Xcode's
+/// parallel test worker processes (each spawned PID dies at 0.000s when the
+/// class is @MainActor). Instead, each test is async and crosses the actor
+/// boundary with `await` — matching the pattern AppStateTests already uses.
 final class AppStateErrorTests: XCTestCase {
     private var dbQueue: DatabaseQueue!
-    private var appState: AppState!
 
     override func setUp() {
         super.setUp()
         dbQueue = try! TestDatabase.makeInMemory()
-        let projectRepo = ProjectRepository(dbQueue: dbQueue)
-        let entryRepo = TimeEntryRepository(dbQueue: dbQueue)
-        let tracker = TimeTracker(
-            projectRepository: projectRepo,
-            timeEntryRepository: entryRepo
-        )
-        appState = AppState(tracker: tracker)
     }
 
     override func tearDown() {
-        appState?.dismissError()
-        appState = nil
         dbQueue = nil
         super.tearDown()
     }
@@ -60,85 +46,102 @@ final class AppStateErrorTests: XCTestCase {
         }
     }
 
-    func testLoadInitialStateSurfacesError() {
-        dropTable("timeEntries")
-
-        appState.loadInitialState()
-
-        XCTAssertNotNil(appState.lastError)
+    @MainActor
+    private func makeAppState() -> AppState {
+        let projectRepo = ProjectRepository(dbQueue: dbQueue)
+        let entryRepo = TimeEntryRepository(dbQueue: dbQueue)
+        let tracker = TimeTracker(
+            projectRepository: projectRepo,
+            timeEntryRepository: entryRepo
+        )
+        return AppState(tracker: tracker)
     }
 
-    func testStartTimerSurfacesError() {
-        appState.loadInitialState()
+    func testLoadInitialStateSurfacesError() async {
+        let appState = await makeAppState()
         dropTable("timeEntries")
-
-        appState.startTimer()
-
-        XCTAssertNotNil(appState.lastError)
+        await appState.loadInitialState()
+        let error = await appState.lastError
+        XCTAssertNotNil(error)
     }
 
-    func testStopTimerSurfacesError() {
-        appState.loadInitialState()
-        appState.startTimer()
-        XCTAssertNil(appState.lastError)
-
+    func testStartTimerSurfacesError() async {
+        let appState = await makeAppState()
+        await appState.loadInitialState()
         dropTable("timeEntries")
-
-        appState.stopTimer()
-
-        XCTAssertNotNil(appState.lastError)
+        await appState.startTimer()
+        let error = await appState.lastError
+        XCTAssertNotNil(error)
     }
 
-    func testCreateProjectSurfacesError() {
-        appState.loadInitialState()
+    func testStopTimerSurfacesError() async {
+        let appState = await makeAppState()
+        await appState.loadInitialState()
+        await appState.startTimer()
+        let preError = await appState.lastError
+        XCTAssertNil(preError)
+
+        dropTable("timeEntries")
+        await appState.stopTimer()
+        let error = await appState.lastError
+        XCTAssertNotNil(error)
+    }
+
+    func testCreateProjectSurfacesError() async {
+        let appState = await makeAppState()
+        await appState.loadInitialState()
         dropTable("projects")
-
-        appState.createProject(name: "fail")
-
-        XCTAssertNotNil(appState.lastError)
+        await appState.createProject(name: "fail")
+        let error = await appState.lastError
+        XCTAssertNotNil(error)
     }
 
-    func testArchiveProjectSurfacesError() throws {
-        appState.loadInitialState()
-        let projectId = try XCTUnwrap(appState.projects.first?.id)
+    func testArchiveProjectSurfacesError() async throws {
+        let appState = await makeAppState()
+        await appState.loadInitialState()
+        let projects = await appState.projects
+        let projectId = try XCTUnwrap(projects.first?.id)
         dropTable("projects")
-
-        appState.archiveProject(id: projectId)
-
-        XCTAssertNotNil(appState.lastError)
+        await appState.archiveProject(id: projectId)
+        let error = await appState.lastError
+        XCTAssertNotNil(error)
     }
 
-    func testDeleteEntrySurfacesError() throws {
-        appState.loadInitialState()
-        appState.startTimer()
-        let entryId = try XCTUnwrap(appState.runningEntry?.id)
+    func testDeleteEntrySurfacesError() async throws {
+        let appState = await makeAppState()
+        await appState.loadInitialState()
+        await appState.startTimer()
+        let running = await appState.runningEntry
+        let entryId = try XCTUnwrap(running?.id)
         dropTable("timeEntries")
-
-        appState.deleteEntry(id: entryId)
-
-        XCTAssertNotNil(appState.lastError)
+        await appState.deleteEntry(id: entryId)
+        let error = await appState.lastError
+        XCTAssertNotNil(error)
     }
 
-    func testUpdateEntrySurfacesError() throws {
-        appState.loadInitialState()
-        appState.startTimer()
-        appState.stopTimer()
-        let entryId = try XCTUnwrap(appState.todaysEntries.first?.id)
+    func testUpdateEntrySurfacesError() async throws {
+        let appState = await makeAppState()
+        await appState.loadInitialState()
+        await appState.startTimer()
+        await appState.stopTimer()
+        let entries = await appState.todaysEntries
+        let entryId = try XCTUnwrap(entries.first?.id)
         dropTable("timeEntries")
-
-        appState.updateEntry(id: entryId, start: Date(), end: Date(), note: nil)
-
-        XCTAssertNotNil(appState.lastError)
+        await appState.updateEntry(id: entryId, start: Date(), end: Date(), note: nil)
+        let error = await appState.lastError
+        XCTAssertNotNil(error)
     }
 
-    func testDismissErrorClearsLastError() {
-        appState.loadInitialState()
+    func testDismissErrorClearsLastError() async {
+        let appState = await makeAppState()
+        await appState.loadInitialState()
         dropTable("timeEntries")
-        appState.startTimer()
-        XCTAssertNotNil(appState.lastError)
+        await appState.startTimer()
+        let error = await appState.lastError
+        XCTAssertNotNil(error)
 
-        appState.dismissError()
-
-        XCTAssertNil(appState.lastError)
+        await appState.dismissError()
+        let cleared = await appState.lastError
+        XCTAssertNil(cleared)
     }
 }
