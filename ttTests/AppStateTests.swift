@@ -28,9 +28,8 @@ final class AppStateErrorTests: XCTestCase {
     private var appState: AppState!
 
     @MainActor
-    override func setUp() {
-        super.setUp()
-        dbQueue = try! TestDatabase.makeInMemory()
+    override func setUp() async throws {
+        dbQueue = try TestDatabase.makeInMemory()
         let projectRepo = ProjectRepository(dbQueue: dbQueue)
         let entryRepo = TimeEntryRepository(dbQueue: dbQueue)
         let tracker = TimeTracker(
@@ -41,16 +40,26 @@ final class AppStateErrorTests: XCTestCase {
     }
 
     @MainActor
-    override func tearDown() {
+    override func tearDown() async throws {
+        appState?.dismissError()
         appState = nil
         dbQueue = nil
-        super.tearDown()
+    }
+
+    /// Uses the synchronous GRDB write overload so the table drop runs on
+    /// the same serial queue path as the repository operations that follow.
+    /// The previous `await dbQueue.write` resolved to the async overload,
+    /// which interacted poorly with @MainActor parallel test execution.
+    @MainActor
+    private func dropTable(_ name: String) {
+        try! dbQueue.write { db in
+            try db.drop(table: name)
+        }
     }
 
     @MainActor
     func testLoadInitialStateSurfacesError() async {
-        // Drop tables so loadInitialState fails
-        try! await dbQueue.write { db in try db.drop(table: "timeEntries") }
+        dropTable("timeEntries")
 
         await appState.loadInitialState()
 
@@ -60,7 +69,7 @@ final class AppStateErrorTests: XCTestCase {
     @MainActor
     func testStartTimerSurfacesError() async {
         await appState.loadInitialState()
-        try! await dbQueue.write { db in try db.drop(table: "timeEntries") }
+        dropTable("timeEntries")
 
         appState.startTimer()
 
@@ -73,7 +82,7 @@ final class AppStateErrorTests: XCTestCase {
         appState.startTimer()
         XCTAssertNil(appState.lastError)
 
-        try! await dbQueue.write { db in try db.drop(table: "timeEntries") }
+        dropTable("timeEntries")
 
         appState.stopTimer()
 
@@ -83,7 +92,7 @@ final class AppStateErrorTests: XCTestCase {
     @MainActor
     func testCreateProjectSurfacesError() async {
         await appState.loadInitialState()
-        try! await dbQueue.write { db in try db.drop(table: "projects") }
+        dropTable("projects")
 
         appState.createProject(name: "fail")
 
@@ -91,10 +100,10 @@ final class AppStateErrorTests: XCTestCase {
     }
 
     @MainActor
-    func testArchiveProjectSurfacesError() async {
+    func testArchiveProjectSurfacesError() async throws {
         await appState.loadInitialState()
-        let projectId = appState.projects.first!.id
-        try! await dbQueue.write { db in try db.drop(table: "projects") }
+        let projectId = try XCTUnwrap(appState.projects.first?.id)
+        dropTable("projects")
 
         appState.archiveProject(id: projectId)
 
@@ -102,11 +111,11 @@ final class AppStateErrorTests: XCTestCase {
     }
 
     @MainActor
-    func testDeleteEntrySurfacesError() async {
+    func testDeleteEntrySurfacesError() async throws {
         await appState.loadInitialState()
         appState.startTimer()
-        let entryId = appState.runningEntry!.id
-        try! await dbQueue.write { db in try db.drop(table: "timeEntries") }
+        let entryId = try XCTUnwrap(appState.runningEntry?.id)
+        dropTable("timeEntries")
 
         appState.deleteEntry(id: entryId)
 
@@ -114,12 +123,12 @@ final class AppStateErrorTests: XCTestCase {
     }
 
     @MainActor
-    func testUpdateEntrySurfacesError() async {
+    func testUpdateEntrySurfacesError() async throws {
         await appState.loadInitialState()
         appState.startTimer()
         appState.stopTimer()
-        let entryId = appState.todaysEntries.first!.id
-        try! await dbQueue.write { db in try db.drop(table: "timeEntries") }
+        let entryId = try XCTUnwrap(appState.todaysEntries.first?.id)
+        dropTable("timeEntries")
 
         appState.updateEntry(id: entryId, start: Date(), end: Date(), note: nil)
 
@@ -129,7 +138,7 @@ final class AppStateErrorTests: XCTestCase {
     @MainActor
     func testDismissErrorClearsLastError() async {
         await appState.loadInitialState()
-        try! await dbQueue.write { db in try db.drop(table: "timeEntries") }
+        dropTable("timeEntries")
         appState.startTimer()
         XCTAssertNotNil(appState.lastError)
 
