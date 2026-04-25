@@ -23,10 +23,10 @@ final class AppStateTests: XCTestCase {
 
 // MARK: - Error Propagation
 
-/// Tests run without @MainActor on the class to avoid crashes in Xcode's
-/// parallel test worker processes (each spawned PID dies at 0.000s when the
-/// class is @MainActor). Instead, each test is async and crosses the actor
-/// boundary with `await` — matching the pattern AppStateTests already uses.
+/// Parallel testing is disabled in CI (-parallel-testing-enabled NO) because
+/// Xcode's parallel test workers crash when spawning processes for test classes
+/// that cross @MainActor boundaries. Each test is async and uses `await` to
+/// access the @MainActor-isolated AppState.
 final class AppStateErrorTests: XCTestCase {
     private var dbQueue: DatabaseQueue!
 

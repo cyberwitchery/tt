@@ -24,6 +24,7 @@ jobs:
         run: |
           xcodebuild -scheme tt \
             -destination 'platform=macOS' \
+            -parallel-testing-enabled NO \
             -enableCodeCoverage YES \
             -resultBundlePath TestResults.xcresult \
             test
