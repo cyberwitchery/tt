@@ -23,10 +23,6 @@ final class AppStateTests: XCTestCase {
 
 // MARK: - Error Propagation
 
-/// Parallel testing is disabled in CI (-parallel-testing-enabled NO) because
-/// Xcode's parallel test workers crash when spawning processes for test classes
-/// that cross @MainActor boundaries. Each test is async and uses `await` to
-/// access the @MainActor-isolated AppState.
 final class AppStateErrorTests: XCTestCase {
     private var dbQueue: DatabaseQueue!
 
@@ -59,7 +55,7 @@ final class AppStateErrorTests: XCTestCase {
 
     func testLoadInitialStateSurfacesError() async {
         let appState = await makeAppState()
-        dropTable("timeEntries")
+        dropTable("time_entries")
         await appState.loadInitialState()
         let error = await appState.lastError
         XCTAssertNotNil(error)
@@ -68,7 +64,7 @@ final class AppStateErrorTests: XCTestCase {
     func testStartTimerSurfacesError() async {
         let appState = await makeAppState()
         await appState.loadInitialState()
-        dropTable("timeEntries")
+        dropTable("time_entries")
         await appState.startTimer()
         let error = await appState.lastError
         XCTAssertNotNil(error)
@@ -81,7 +77,7 @@ final class AppStateErrorTests: XCTestCase {
         let preError = await appState.lastError
         XCTAssertNil(preError)
 
-        dropTable("timeEntries")
+        dropTable("time_entries")
         await appState.stopTimer()
         let error = await appState.lastError
         XCTAssertNotNil(error)
@@ -113,7 +109,7 @@ final class AppStateErrorTests: XCTestCase {
         await appState.startTimer()
         let running = await appState.runningEntry
         let entryId = try XCTUnwrap(running?.id)
-        dropTable("timeEntries")
+        dropTable("time_entries")
         await appState.deleteEntry(id: entryId)
         let error = await appState.lastError
         XCTAssertNotNil(error)
@@ -126,7 +122,7 @@ final class AppStateErrorTests: XCTestCase {
         await appState.stopTimer()
         let entries = await appState.todaysEntries
         let entryId = try XCTUnwrap(entries.first?.id)
-        dropTable("timeEntries")
+        dropTable("time_entries")
         await appState.updateEntry(id: entryId, start: Date(), end: Date(), note: nil)
         let error = await appState.lastError
         XCTAssertNotNil(error)
@@ -135,7 +131,7 @@ final class AppStateErrorTests: XCTestCase {
     func testDismissErrorClearsLastError() async {
         let appState = await makeAppState()
         await appState.loadInitialState()
-        dropTable("timeEntries")
+        dropTable("time_entries")
         await appState.startTimer()
         let error = await appState.lastError
         XCTAssertNotNil(error)

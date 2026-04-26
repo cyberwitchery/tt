@@ -24,7 +24,6 @@ jobs:
         run: |
           xcodebuild -scheme tt \
             -destination 'platform=macOS' \
-            -parallel-testing-enabled NO \
             -enableCodeCoverage YES \
             -resultBundlePath TestResults.xcresult \
             test
@@ -37,20 +36,8 @@ jobs:
           import sys, json
 
           data = json.load(sys.stdin)
-          covered = 0
-          total = 0
 
           # Only count files in Domain/ or Persistence/
-          for target in data.get('targets', []):
-              for file in target.get('files', []):
-                  path = file.get('path', '')
-                  if '/Domain/' in path or '/Persistence/' in path:
-                      covered += file.get('coveredLines', 0)
-                      total += file.get('lineCoverage', 0) * file.get('executableLines', 1) if file.get('executableLines', 0) > 0 else 0
-                      total = file.get('executableLines', 0)
-                      covered = file.get('coveredLines', 0)
-
-          # Recalculate properly
           covered_total = 0
           exec_total = 0
           for target in data.get('targets', []):
