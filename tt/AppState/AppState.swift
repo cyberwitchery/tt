@@ -19,6 +19,8 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     @Published private(set) var idleSeconds: Int?
     @Published var selectedProjectId: String?
     @Published var elapsedSeconds: Int = 0
+    @Published private(set) var lastError: String?
+    private var errorDismissTask: Task<Void, Never>?
 
     private init() {
         let projectRepository = ProjectRepository()
@@ -28,7 +30,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             timeEntryRepository: timeEntryRepository
         )
         tracker.delegate = self
-        Task { await loadInitialState() }
+        Task { self.loadInitialState() }
     }
 
     // For testing only
@@ -68,7 +70,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         return seconds
     }
 
-    func loadInitialState() async {
+    func loadInitialState() {
         do {
             try tracker.loadInitialState()
             syncFromTracker()
@@ -83,6 +85,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             projectCompletedTotals = [:]
             startedAt = nil
             idleSeconds = nil
+            surfaceError(error)
         }
     }
 
@@ -92,7 +95,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             syncFromTracker()
             restartTimerIfNeeded()
         } catch {
-            return
+            surfaceError(error)
         }
     }
 
@@ -103,7 +106,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             stopTimerUpdates()
             elapsedSeconds = 0
         } catch {
-            return
+            surfaceError(error)
         }
     }
 
@@ -117,7 +120,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             try tracker.createProject(name: name)
             syncFromTracker()
         } catch {
-            return
+            surfaceError(error)
         }
     }
 
@@ -126,7 +129,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             try tracker.archiveProject(id: id)
             syncFromTracker()
         } catch {
-            return
+            surfaceError(error)
         }
     }
 
@@ -169,7 +172,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             syncFromTracker()
             restartTimerIfNeeded()
         } catch {
-            return
+            surfaceError(error)
         }
     }
 
@@ -179,7 +182,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             syncFromTracker()
             restartTimerIfNeeded()
         } catch {
-            return
+            surfaceError(error)
         }
     }
 
@@ -197,8 +200,28 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         syncFromTracker()
     }
 
-    func exportCSV(range: Range<Date>, to url: URL, now: Date = Date()) throws {
-        try tracker.exportCSV(range: range, to: url, now: now)
+    func exportCSV(range: Range<Date>, to url: URL, now: Date = Date()) {
+        do {
+            try tracker.exportCSV(range: range, to: url, now: now)
+        } catch {
+            surfaceError(error)
+        }
+    }
+
+    func dismissError() {
+        errorDismissTask?.cancel()
+        errorDismissTask = nil
+        lastError = nil
+    }
+
+    private func surfaceError(_ error: Error) {
+        lastError = error.localizedDescription
+        errorDismissTask?.cancel()
+        errorDismissTask = Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled else { return }
+            lastError = nil
+        }
     }
 }
 

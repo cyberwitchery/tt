@@ -50,8 +50,12 @@ struct MainWindowView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
+                if let errorMessage = appState.lastError {
+                    errorBanner(errorMessage)
+                        .padding(.top, 40)
+                }
                 headerRow
-                    .padding(.top, 40)
+                    .padding(.top, appState.lastError == nil ? 40 : 10)
                     .zIndex(20) // header dropdown must float above later sections
                 timerRow
                     .padding(.top, 14)
@@ -175,6 +179,26 @@ struct MainWindowView: View {
                     .kerning(1.3)
             }
         }
+    }
+
+    private func errorBanner(_ message: String) -> some View {
+        HStack(spacing: 8) {
+            Text(message)
+                .font(BrutalistTheme.bodyFont)
+                .foregroundColor(BrutalistTheme.fg)
+                .lineLimit(2)
+            Spacer()
+            BrutalistTextButton(title: "dismiss", muted: true) {
+                appState.dismissError()
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .background(BrutalistTheme.accent.opacity(0.15))
+        .overlay(
+            Rectangle()
+                .strokeBorder(BrutalistTheme.accent, lineWidth: 1)
+        )
     }
 
     // MARK: - Timer
@@ -704,7 +728,7 @@ struct MainWindowView: View {
         panel.allowedContentTypes = [UTType.commaSeparatedText]
         panel.nameFieldStringValue = "tt-export.csv"
         if panel.runModal() == .OK, let url = panel.url {
-            try? appState.exportCSV(range: start..<end.addingTimeInterval(86400), to: url)
+            appState.exportCSV(range: start..<end.addingTimeInterval(86400), to: url)
         }
     }
 
