@@ -11,14 +11,14 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build
         run: xcodebuild -scheme tt -destination 'platform=macOS' build
 
   tests:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Run tests with coverage
         run: |
@@ -66,7 +66,7 @@ jobs:
   ui-tests:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Run UI tests
         run: |
