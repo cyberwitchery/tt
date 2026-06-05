@@ -2,19 +2,19 @@ name: ci
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 env:
   MIN_COVERAGE: 80
 
 jobs:
-  build:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v6
-      - name: Build
-        run: xcodebuild -scheme tt -destination 'platform=macOS' build
-
+  # The tests job runs `xcodebuild test`, which compiles first — a separate
+  # build job would just duplicate that compile on the 10x-priced macOS runner.
   tests:
     runs-on: macos-latest
     steps:
