@@ -77,17 +77,21 @@ final class TimeEntryRepository {
     }
 
     func fetchCompletedTotalsByProject() throws -> [String: Int] {
-        let entries = try dbQueue.read { db in
-            try TimeEntry
-                .filter(Column("end") != nil)
-                .fetchAll(db)
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT projectId, \
+                SUM(CAST(MAX(0, strftime('%s', "end") - strftime('%s', start)) AS INTEGER)) \
+                AS totalSeconds \
+                FROM time_entries \
+                WHERE "end" IS NOT NULL \
+                GROUP BY projectId
+                """)
+            var totals: [String: Int] = [:]
+            for row in rows {
+                totals[row["projectId"]] = row["totalSeconds"]
+            }
+            return totals
         }
-        var totals: [String: Int] = [:]
-        for entry in entries {
-            guard let end = entry.end else { continue }
-            totals[entry.projectId, default: 0] += TimeMath.durationSeconds(start: entry.start, end: end)
-        }
-        return totals
     }
 
     func fetchEntries(in range: Range<Date>) throws -> [TimeEntry] {
