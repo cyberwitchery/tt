@@ -71,6 +71,9 @@ struct MainWindowView: View {
                 reportsSection
                 BrutalistDivider()
 
+                COCOMOSectionView(appState: appState)
+                BrutalistDivider()
+
                 exportSection
                     .padding(.bottom, 4)
             }

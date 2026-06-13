@@ -7,6 +7,7 @@ protocol TimeTrackerDelegate: AnyObject {
 final class TimeTracker {
     private let projectRepository: ProjectRepository
     private let timeEntryRepository: TimeEntryRepository
+    private let cocomoRepository: COCOMORepository
 
     weak var delegate: TimeTrackerDelegate?
 
@@ -27,12 +28,16 @@ final class TimeTracker {
         return max(0, Int(now.timeIntervalSince(last).rounded(.down)))
     }
 
+    private(set) var cocomoParams: COCOMOParams?
+
     init(
         projectRepository: ProjectRepository,
-        timeEntryRepository: TimeEntryRepository
+        timeEntryRepository: TimeEntryRepository,
+        cocomoRepository: COCOMORepository = COCOMORepository()
     ) {
         self.projectRepository = projectRepository
         self.timeEntryRepository = timeEntryRepository
+        self.cocomoRepository = cocomoRepository
     }
 
     // MARK: - Initial Load
@@ -45,6 +50,7 @@ final class TimeTracker {
         runningEntry = try timeEntryRepository.fetchRunning()
         todaysEntries = try timeEntryRepository.fetchEntriesForToday()
         refreshReports()
+        refreshCOCOMOParams()
     }
 
     // MARK: - Timer Control
@@ -83,6 +89,7 @@ final class TimeTracker {
 
     func selectProject(id: String) {
         selectedProjectId = id
+        refreshCOCOMOParams()
     }
 
     func createProject(name: String) throws {
@@ -201,6 +208,22 @@ final class TimeTracker {
             seconds += TimeMath.durationSeconds(start: entry.start, end: entry.end, now: now)
         }
         return seconds
+    }
+
+    // MARK: - COCOMO
+
+    func refreshCOCOMOParams() {
+        guard let projectId = selectedProjectId else {
+            cocomoParams = nil
+            return
+        }
+        cocomoParams = try? cocomoRepository.fetchOrDefault(projectId: projectId)
+    }
+
+    func updateCOCOMOParams(_ params: COCOMOParams) throws {
+        try cocomoRepository.save(params)
+        cocomoParams = params
+        delegate?.timeTrackerDidUpdate()
     }
 
     // MARK: - Export

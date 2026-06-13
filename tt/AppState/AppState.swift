@@ -19,6 +19,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     @Published private(set) var idleSeconds: Int?
     @Published var selectedProjectId: String?
     @Published var elapsedSeconds: Int = 0
+    @Published private(set) var cocomoParams: COCOMOParams?
     @Published private(set) var lastError: String?
     private var errorDismissTask: Task<Void, Never>?
 
@@ -54,6 +55,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         projectCompletedTotals = tracker.projectCompletedTotals
         startedAt = tracker.startedAt
         selectedProjectId = tracker.selectedProjectId
+        cocomoParams = tracker.cocomoParams
         updateElapsed()
         updateIdle()
     }
@@ -85,6 +87,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             projectCompletedTotals = [:]
             startedAt = nil
             idleSeconds = nil
+            cocomoParams = nil
             surfaceError(error)
         }
     }
@@ -198,6 +201,15 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     func refreshReports(now: Date = Date(), calendar: Calendar = .current) {
         tracker.refreshReports(now: now, calendar: calendar)
         syncFromTracker()
+    }
+
+    func updateCOCOMOParams(_ params: COCOMOParams) {
+        do {
+            try tracker.updateCOCOMOParams(params)
+            syncFromTracker()
+        } catch {
+            surfaceError(error)
+        }
     }
 
     func exportCSV(range: Range<Date>, to url: URL, now: Date = Date()) {

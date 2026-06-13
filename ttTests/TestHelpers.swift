@@ -27,6 +27,35 @@ enum TestDatabase {
             }
         }
 
+        migrator.registerMigration("createCOCOMOParams") { db in
+            try db.create(table: COCOMOParams.databaseTableName) { t in
+                t.column("projectId", .text).primaryKey()
+                t.column("sloc", .integer).notNull().defaults(to: 0)
+                t.column("prec", .integer).notNull().defaults(to: 2)
+                t.column("flex", .integer).notNull().defaults(to: 2)
+                t.column("resl", .integer).notNull().defaults(to: 2)
+                t.column("team", .integer).notNull().defaults(to: 2)
+                t.column("pmat", .integer).notNull().defaults(to: 2)
+                t.column("rely", .integer).notNull().defaults(to: 2)
+                t.column("data", .integer).notNull().defaults(to: 2)
+                t.column("cplx", .integer).notNull().defaults(to: 2)
+                t.column("ruse", .integer).notNull().defaults(to: 2)
+                t.column("docu", .integer).notNull().defaults(to: 2)
+                t.column("time", .integer).notNull().defaults(to: 2)
+                t.column("stor", .integer).notNull().defaults(to: 2)
+                t.column("pvol", .integer).notNull().defaults(to: 2)
+                t.column("acap", .integer).notNull().defaults(to: 2)
+                t.column("pcap", .integer).notNull().defaults(to: 2)
+                t.column("pcon", .integer).notNull().defaults(to: 2)
+                t.column("apex", .integer).notNull().defaults(to: 2)
+                t.column("plex", .integer).notNull().defaults(to: 2)
+                t.column("ltex", .integer).notNull().defaults(to: 2)
+                t.column("tool", .integer).notNull().defaults(to: 2)
+                t.column("site", .integer).notNull().defaults(to: 2)
+                t.column("sced", .integer).notNull().defaults(to: 2)
+            }
+        }
+
         try migrator.migrate(dbQueue)
         return dbQueue
     }
