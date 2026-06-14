@@ -1,7 +1,7 @@
 import Cocoa
 import SwiftUI
 
-// Borderless, non-activating menu-bar popover panel. Overriding `canBecomeKey`
+// borderless, non-activating menu-bar popover panel. overriding `canBecomeKey`
 // so SwiftUI `Button` taps fire reliably inside the popover — without the
 // override a borderless panel can't become key and `Button` actions are flaky.
 final class StatusPopoverPanel: NSPanel {

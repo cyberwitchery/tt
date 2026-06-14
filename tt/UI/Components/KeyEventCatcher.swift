@@ -1,9 +1,9 @@
 import SwiftUI
 import AppKit
 
-/// Installs a local NSEvent keyDown monitor scoped to the view's window.
-/// Return `nil` from the handler to consume the event, or the event to pass it
-/// through. The monitor is added when the view attaches to a window and removed
+/// installs a local NSEvent keyDown monitor scoped to the view's window.
+/// return `nil` from the handler to consume the event, or the event to pass it
+/// through. the monitor is added when the view attaches to a window and removed
 /// when it detaches.
 struct KeyEventCatcher: NSViewRepresentable {
     let handler: (NSEvent) -> NSEvent?

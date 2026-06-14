@@ -31,7 +31,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             dbQueue = try DatabaseManager.shared.get().dbQueue
         } catch {
             dbError = error
-            // In-memory fallback so the UI still renders (data won't persist).
+            // in-memory fallback so the UI still renders (data won't persist).
             // loadInitialState will fail on missing tables — that error is
             // caught and surfaced through lastError.
             dbQueue = try! DatabaseQueue()
@@ -53,7 +53,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         }
     }
 
-    // For testing only
+    // for testing only
     init(tracker: TimeTracker) {
         self.tracker = tracker
         tracker.delegate = self

@@ -194,7 +194,7 @@ final class TimeTracker {
         }
     }
 
-    // All-time project total including the running entry's live contribution.
+    // all-time project total including the running entry's live contribution.
     func projectAllTimeSeconds(for projectId: String, now: Date = Date()) -> Int {
         var seconds = projectCompletedTotals[projectId] ?? 0
         if let entry = runningEntry, entry.projectId == projectId {

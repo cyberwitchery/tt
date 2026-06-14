@@ -5,13 +5,13 @@ import UniformTypeIdentifiers
 struct MainWindowView: View {
     @ObservedObject var appState: AppState
 
-    // Picker state
+    // picker state
     @State private var projectPickerOpen = false
 
-    // Timer confirm
+    // timer confirm
     @State private var confirmingStop = false
 
-    // Entry editor
+    // entry editor
     @State private var editingEntryId: String?
     @State private var editFields = EntryEditor.Fields(startSeconds: 0, endSeconds: 0, durationSeconds: 0)
     @State private var editProjectId: String?
@@ -21,20 +21,20 @@ struct MainWindowView: View {
     @State private var editDurText = ""
     @State private var editProjectPickerOpen = false
 
-    // Projects section
+    // projects section
     @State private var addingProject = false
     @State private var newProjectName = ""
     @FocusState private var newProjectFocused: Bool
     @State private var confirmingArchiveId: String?
 
-    // Export
+    // export
     @State private var exportStart: Date = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? Date()
     @State private var exportEnd: Date = Date()
 
-    // Keyboard flow: after user picks a project via the N shortcut, start timer.
+    // keyboard flow: after user picks a project via the N shortcut, start timer.
     @State private var startAfterProjectPick = false
 
-    // Week day labels (Mon..Sun, localized short)
+    // week day labels (Mon..Sun, localized short)
     private static let dayFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "EE"
@@ -99,7 +99,7 @@ struct MainWindowView: View {
     private func handleKey(_ event: NSEvent) -> NSEvent? {
         let isTextFocused = event.window?.firstResponder is NSText
 
-        // Esc is the only key we handle while a text field is focused.
+        // esc is the only key we handle while a text field is focused.
         if isTextFocused && event.keyCode != KeyCode.escape { return event }
 
         switch event.keyCode {
@@ -482,9 +482,9 @@ struct MainWindowView: View {
         let isRunning = appState.runningEntry?.id == entry.id
         let newProjectId = editProjectId ?? entry.projectId
         if newProjectId != entry.projectId {
-            // TimeTracker.updateEntry doesn't currently touch projectId. For
+            // TimeTracker.updateEntry doesn't currently touch projectId. for
             // minimal risk, update project through a separate path if needed.
-            // For now accept the change; the repo.update writes the full row.
+            // for now accept the change; the repo.update writes the full row.
         }
         appState.updateEntry(
             id: entry.id,

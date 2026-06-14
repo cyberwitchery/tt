@@ -10,7 +10,7 @@ extension Color {
 }
 
 enum BrutalistTheme {
-    // Palette — dark only
+    // palette — dark only
     static let bg         = Color(hex: 0x0a0a0a)
     static let fg         = Color(hex: 0xeaeaea)
     static let dim        = Color(hex: 0x666666)
@@ -25,12 +25,12 @@ enum BrutalistTheme {
     static let danger     = Color(hex: 0xe06464)
     static let dangerHot  = Color(hex: 0xff8080)
 
-    // Font family PostScript names (bundled TTFs)
+    // font family PostScript names (bundled TTFs)
     static let fontRegular  = "JetBrainsMono-Regular"
     static let fontMedium   = "JetBrainsMono-Medium"
     static let fontSemibold = "JetBrainsMono-SemiBold"
 
-    // Typography — sizes per design handoff
+    // typography — sizes per design handoff
     static let timerMainFont    = Font.custom(fontMedium,   size: 36)
     static let timerPopoverFont = Font.custom(fontMedium,   size: 26)
     static let sectionHeaderFont = Font.custom(fontSemibold, size: 10)
@@ -43,7 +43,7 @@ enum BrutalistTheme {
     static let captionFont      = Font.custom(fontRegular,  size: 11)
     static let displayFont      = timerMainFont
 
-    // Spacing — compact density
+    // spacing — compact density
     static let padding: CGFloat            = 20  // horizontal window body padding
     static let paddingTop: CGFloat         = 16
     static let sectionSpacing: CGFloat     = 12  // rule margin
@@ -54,8 +54,8 @@ enum BrutalistTheme {
 }
 
 extension BrutalistTheme {
-    // Legacy accessors — the `ColorScheme` parameter is ignored now that light
-    // mode is dropped. Kept so the currently-committed views keep compiling
+    // legacy accessors — the `ColorScheme` parameter is ignored now that light
+    // mode is dropped. kept so the currently-committed views keep compiling
     // while the UI phases land.
     static func background(for scheme: ColorScheme) -> Color { bg }
     static func foreground(for scheme: ColorScheme) -> Color { fg }
@@ -146,8 +146,8 @@ struct BrutalistDivider: View {
     }
 }
 
-/// A horizontal dotted fill that expands to take available space between two
-/// siblings in an `HStack`. Matches the `#2a2a2a` 1px-dotted leader with a
+/// a horizontal dotted fill that expands to take available space between two
+/// siblings in an `HStack`. matches the `#2a2a2a` 1px-dotted leader with a
 /// -4pt baseline shift from the design handoff.
 struct DottedLeader: View {
     var color: Color = BrutalistTheme.leader
