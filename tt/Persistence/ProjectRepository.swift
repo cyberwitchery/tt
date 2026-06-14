@@ -4,7 +4,7 @@ import GRDB
 final class ProjectRepository {
     private let dbQueue: DatabaseQueue
 
-    init(dbQueue: DatabaseQueue = DatabaseManager.shared.dbQueue) {
+    init(dbQueue: DatabaseQueue) {
         self.dbQueue = dbQueue
     }
 

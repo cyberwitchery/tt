@@ -2,21 +2,21 @@ import Foundation
 import GRDB
 
 final class DatabaseManager {
-    static let shared = DatabaseManager()
+    static let shared: Result<DatabaseManager, Error> = Result { try DatabaseManager() }
 
     let dbQueue: DatabaseQueue
 
-    private init() {
+    private init() throws {
         let fileManager = FileManager.default
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let folderURL = appSupport.appendingPathComponent("tt", isDirectory: true)
 
-        try? fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true)
 
         let dbURL = folderURL.appendingPathComponent("tt.sqlite")
-        dbQueue = try! DatabaseQueue(path: dbURL.path)
+        dbQueue = try DatabaseQueue(path: dbURL.path)
 
-        try? migrator.migrate(dbQueue)
+        try migrator.migrate(dbQueue)
     }
 
     private var migrator: DatabaseMigrator {
