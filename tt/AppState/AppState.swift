@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import GRDB
 
 @MainActor
 final class AppState: ObservableObject, TimeTrackerDelegate {
@@ -23,14 +24,33 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     private var errorDismissTask: Task<Void, Never>?
 
     private init() {
-        let projectRepository = ProjectRepository()
-        let timeEntryRepository = TimeEntryRepository()
+        let dbQueue: DatabaseQueue
+        var dbError: Error?
+
+        do {
+            dbQueue = try DatabaseManager.shared.get().dbQueue
+        } catch {
+            dbError = error
+            // In-memory fallback so the UI still renders (data won't persist).
+            // loadInitialState will fail on missing tables — that error is
+            // caught and surfaced through lastError.
+            dbQueue = try! DatabaseQueue()
+        }
+
+        let projectRepository = ProjectRepository(dbQueue: dbQueue)
+        let timeEntryRepository = TimeEntryRepository(dbQueue: dbQueue)
         self.tracker = TimeTracker(
             projectRepository: projectRepository,
             timeEntryRepository: timeEntryRepository
         )
         tracker.delegate = self
-        Task { self.loadInitialState() }
+
+        Task {
+            if let dbError {
+                self.surfaceError(dbError)
+            }
+            self.loadInitialState()
+        }
     }
 
     // For testing only
