@@ -5,13 +5,10 @@ import UniformTypeIdentifiers
 struct MainWindowView: View {
     @ObservedObject var appState: AppState
 
-    // picker state
     @State private var projectPickerOpen = false
 
-    // timer confirm
     @State private var confirmingStop = false
 
-    // entry editor
     @State private var editingEntryId: String?
     @State private var editFields = EntryEditor.Fields(startSeconds: 0, endSeconds: 0, durationSeconds: 0)
     @State private var editProjectId: String?
@@ -21,13 +18,11 @@ struct MainWindowView: View {
     @State private var editDurText = ""
     @State private var editProjectPickerOpen = false
 
-    // projects section
     @State private var addingProject = false
     @State private var newProjectName = ""
     @FocusState private var newProjectFocused: Bool
     @State private var confirmingArchiveId: String?
 
-    // export
     @State private var exportStart: Date = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? Date()
     @State private var exportEnd: Date = Date()
 
@@ -482,9 +477,6 @@ struct MainWindowView: View {
         let isRunning = appState.runningEntry?.id == entry.id
         let newProjectId = editProjectId ?? entry.projectId
         if newProjectId != entry.projectId {
-            // TimeTracker.updateEntry doesn't currently touch projectId. for
-            // minimal risk, update project through a separate path if needed.
-            // for now accept the change; the repo.update writes the full row.
         }
         appState.updateEntry(
             id: entry.id,

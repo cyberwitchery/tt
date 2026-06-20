@@ -1,4 +1,4 @@
 import SwiftUI
 
-// kept for backwards compatibility - use BrutalistDivider
+// alias for BrutalistDivider
 typealias SectionDivider = BrutalistDivider

@@ -54,9 +54,7 @@ enum BrutalistTheme {
 }
 
 extension BrutalistTheme {
-    // legacy accessors — the `ColorScheme` parameter is ignored now that light
-    // mode is dropped. kept so the currently-committed views keep compiling
-    // while the UI phases land.
+    // the `ColorScheme` parameter is ignored — the UI is dark-only.
     static func background(for scheme: ColorScheme) -> Color { bg }
     static func foreground(for scheme: ColorScheme) -> Color { fg }
     static func secondary(for scheme: ColorScheme) -> Color { dim2 }

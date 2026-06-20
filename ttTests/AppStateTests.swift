@@ -2,7 +2,7 @@ import XCTest
 import GRDB
 @testable import tt
 
-// AppState is now a thin UI wrapper around TimeTracker.
+// AppState is a thin UI wrapper around TimeTracker.
 // Core business logic is tested in TimeTrackerTests.
 // These tests verify the wrapper properly delegates to TimeTracker.
 
