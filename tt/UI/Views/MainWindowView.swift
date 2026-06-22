@@ -476,8 +476,6 @@ struct MainWindowView: View {
         let (start, end) = EntryEditor.resolve(editFields, baseDate: entry.start)
         let isRunning = appState.runningEntry?.id == entry.id
         let newProjectId = editProjectId ?? entry.projectId
-        if newProjectId != entry.projectId {
-        }
         appState.updateEntry(
             id: entry.id,
             start: start,
