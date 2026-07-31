@@ -32,7 +32,7 @@ co-evolved using ai.
 ## brutalist ui principles
 
 - monochrome palette (black/white/gray)
-- monospaced typography (`.monospaced` design)
+- monospaced typography (bundled JetBrains Mono)
 - text-first layout, minimal padding
 - square corners, hard dividers
 - sections separated by `* * *`
