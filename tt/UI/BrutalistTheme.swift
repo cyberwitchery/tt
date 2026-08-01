@@ -10,7 +10,7 @@ extension Color {
 }
 
 enum BrutalistTheme {
-    // palette — dark only
+    // palette
     static let bg         = Color(hex: 0x0a0a0a)
     static let fg         = Color(hex: 0xeaeaea)
     static let dim        = Color(hex: 0x666666)

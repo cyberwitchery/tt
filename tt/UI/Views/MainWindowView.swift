@@ -29,7 +29,7 @@ struct MainWindowView: View {
     // keyboard flow: after user picks a project via the N shortcut, start timer.
     @State private var startAfterProjectPick = false
 
-    // week day labels (Mon..Sun, localized short)
+    // week day labels (localized short)
     private static let dayFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "EE"
@@ -111,7 +111,7 @@ struct MainWindowView: View {
                 projectPickerOpen = true
             }
             return nil
-        case KeyCode.p: // focus project picker
+        case KeyCode.p: // open project picker
             projectPickerOpen = true
             return nil
         case KeyCode.e: // edit currently running entry

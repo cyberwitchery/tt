@@ -13,7 +13,7 @@ env:
   MIN_COVERAGE: 80
 
 jobs:
-  # The tests job runs `xcodebuild test`, which compiles first — a separate
+  # the tests job runs `xcodebuild test`, which compiles first — a separate
   # build job would just duplicate that compile on the 10x-priced macOS runner.
   tests:
     runs-on: macos-latest
@@ -30,14 +30,13 @@ jobs:
 
       - name: Check coverage threshold (logic layer only)
         run: |
-          # Calculate coverage for Domain and Persistence only (excludes UI, AppDelegate, etc.)
+          # calculate coverage for Domain and Persistence only (excludes UI, AppDelegate, etc.)
           COVERAGE=$(xcrun xccov view --report --json TestResults.xcresult | \
             python3 -c "
           import sys, json
 
           data = json.load(sys.stdin)
 
-          # Only count files in Domain/ or Persistence/
           covered_total = 0
           exec_total = 0
           for target in data.get('targets', []):

@@ -1,8 +1,7 @@
 import SwiftUI
 
 /// tappable project label with a floating dropdown of all projects (with
-/// all-time totals) and a `+ new project` option at the bottom. used in the
-/// main-window header and the status popover.
+/// all-time totals) and a `+ new project` option at the bottom.
 struct HeaderProjectPicker: View {
     let projects: [Project]
     @Binding var selectedId: String?
@@ -138,9 +137,7 @@ struct HeaderProjectPicker: View {
     }
 }
 
-/// shared HH:MM / HH:MM:SS helpers for the UI layer. kept here so multiple
-/// components can share formatting logic without importing `TimeMath`
-/// indirectly.
+/// shared HH:MM / HH:MM:SS helpers for the ui layer.
 enum HMS {
     /// `HHHH:MM` (unpadded hours when large, zero-padded otherwise). no seconds.
     static func hoursMinutes(_ seconds: Int) -> String {
@@ -153,7 +150,7 @@ enum HMS {
         return String(format: "%02d:%02d", h, m)
     }
 
-    /// `HH:MM:SS`, timer-style. hours unpadded when >= 1000 per spec.
+    /// `HH:MM:SS`, timer-style. hours unpadded when >= 1000.
     static func hoursMinutesSeconds(_ seconds: Int) -> String {
         let clamped = max(0, seconds)
         let h = clamped / 3600

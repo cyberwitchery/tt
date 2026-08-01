@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// `#141414` bg + 1px `#262626` hairline border — used for the inline editor,
-/// add-row, confirm, chip, and picker-menu surfaces.
+/// `#141414` bg + 1px `#262626` hairline border (inline editor and add-row
+/// surfaces).
 struct SurfaceStyle: ViewModifier {
     var verticalPadding: CGFloat
     var horizontalPadding: CGFloat

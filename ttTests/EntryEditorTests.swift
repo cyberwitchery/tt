@@ -12,7 +12,7 @@ final class EntryEditorTests: XCTestCase {
         calendar.date(from: DateComponents(year: y, month: mo, day: d, hour: h, minute: m, second: s))!
     }
 
-    // MARK: - fields(from:)
+    // MARK: - fields(start:end:)
 
     func testFieldsFromStartAndEnd() {
         let start = date(h: 9, m: 30)

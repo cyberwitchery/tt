@@ -68,7 +68,7 @@ final class TrackerDerivationsTests: XCTestCase {
         let start = Date.from(year: 2025, month: 1, day: 1, hour: 9)
         let end = Date.from(year: 2025, month: 1, day: 1, hour: 10)
         try timeEntryRepository.insertRunning(entry: TimeEntry(projectId: project.id, start: start))
-        // Close that entry manually at `end`.
+        // close that entry manually at `end`.
         var entry = try timeEntryRepository.fetchRunning()!
         entry.end = end
         try timeEntryRepository.update(entry)
@@ -94,7 +94,7 @@ final class TrackerDerivationsTests: XCTestCase {
 
         try tracker.loadInitialState()
 
-        // Clock skew: now earlier than last end.
+        // clock skew: now earlier than last end.
         let now = end.addingTimeInterval(-60)
         XCTAssertEqual(tracker.idleSeconds(now: now), 0)
     }
@@ -127,7 +127,6 @@ final class TrackerDerivationsTests: XCTestCase {
         try insertEnded(projectId: a.id,
                         start: Date.from(year: 2025, month: 1, day: 1, hour: 9),
                         end:   Date.from(year: 2025, month: 1, day: 1, hour: 10))
-        // Currently running entry should not be reflected in completed totals.
         try timeEntryRepository.insertRunning(entry: TimeEntry(
             projectId: a.id,
             start: Date.from(year: 2025, month: 1, day: 1, hour: 11)

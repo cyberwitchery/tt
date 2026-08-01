@@ -3,8 +3,8 @@ import GRDB
 @testable import tt
 
 // AppState is a thin UI wrapper around TimeTracker.
-// Core business logic is tested in TimeTrackerTests.
-// These tests verify the wrapper properly delegates to TimeTracker.
+// core business logic is tested in TimeTrackerTests; these tests verify the
+// wrapper properly delegates to TimeTracker.
 
 final class AppStateTests: XCTestCase {
     func testSelectProjectUpdatesState() async {

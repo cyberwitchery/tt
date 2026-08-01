@@ -75,7 +75,7 @@ final class TimeEntryRepositoryTests: XCTestCase {
             start: Date.from(year: 2024, month: 1, day: 1, hour: 10, minute: 30),
             end:   Date.from(year: 2024, month: 1, day: 1, hour: 11)
         ))
-        // Running entry (no end) — not counted
+        // running entry (no end), not counted
         try repository.insertRunning(entry: TimeEntry(
             projectId: "p2",
             start: Date.from(year: 2024, month: 1, day: 1, hour: 12)
@@ -102,7 +102,7 @@ final class TimeEntryRepositoryTests: XCTestCase {
             start: Date.from(year: 2024, month: 1, day: 1, hour: 8),
             end:   Date.from(year: 2024, month: 1, day: 1, hour: 11) // latest end
         ))
-        // Running — no end, should be ignored.
+        // running, no end, ignored.
         try repository.insertRunning(entry: TimeEntry(
             projectId: "p3",
             start: Date.from(year: 2024, month: 1, day: 1, hour: 12)
@@ -216,25 +216,21 @@ final class TimeEntryRepositoryTests: XCTestCase {
     }
 
     func testFetchEntriesIncludesOverlapping() throws {
-        // Entry that starts before range but ends within
         let overlapsStart = TimeEntry(
             projectId: "p1",
             start: Date.from(year: 2024, month: 1, day: 1, hour: 8),
             end: Date.from(year: 2024, month: 1, day: 1, hour: 11)
         )
-        // Entry that starts within range but ends after
         let overlapsEnd = TimeEntry(
             projectId: "p1",
             start: Date.from(year: 2024, month: 1, day: 1, hour: 14),
             end: Date.from(year: 2024, month: 1, day: 1, hour: 18)
         )
-        // Entry fully within range
         let within = TimeEntry(
             projectId: "p1",
             start: Date.from(year: 2024, month: 1, day: 1, hour: 11),
             end: Date.from(year: 2024, month: 1, day: 1, hour: 13)
         )
-        // Entry fully outside range
         let outside = TimeEntry(
             projectId: "p1",
             start: Date.from(year: 2024, month: 1, day: 2, hour: 9),
@@ -301,7 +297,7 @@ final class TimeEntryRepositoryTests: XCTestCase {
 
         let running = try repository.fetchRunning()
         XCTAssertNotNil(running)
-        XCTAssertEqual(running?.id, third.id) // Most recent stays running
+        XCTAssertEqual(running?.id, third.id) // most recent stays running
 
         let all = try dbQueue.read { db in
             try TimeEntry.fetchAll(db)
@@ -310,7 +306,6 @@ final class TimeEntryRepositoryTests: XCTestCase {
         let closed = all.filter { $0.end != nil }
         XCTAssertEqual(closed.count, 2)
 
-        // Verify the older entries were closed at the start of the newest running
         for entry in closed {
             XCTAssertEqual(entry.end, third.start)
         }
