@@ -17,7 +17,6 @@
 		A10000000000000000000007 /* ProjectRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* ProjectRepository.swift */; };
 		A10000000000000000000008 /* TimeEntryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018 /* TimeEntryRepository.swift */; };
 		A10000000000000000000009 /* BrutalistTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* BrutalistTheme.swift */; };
-		A1000000000000000000000A /* SectionDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001A /* SectionDivider.swift */; };
 		A1000000000000000000000B /* StatusPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001B /* StatusPopoverView.swift */; };
 		A1000000000000000000000C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001C /* Assets.xcassets */; };
 		A1000000000000000000000D /* TimeMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001D /* TimeMathTests.swift */; };
@@ -87,7 +86,6 @@
 		A10000000000000000000017 /* ProjectRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRepository.swift; sourceTree = "<group>"; };
 		A10000000000000000000018 /* TimeEntryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeEntryRepository.swift; sourceTree = "<group>"; };
 		A10000000000000000000019 /* BrutalistTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrutalistTheme.swift; sourceTree = "<group>"; };
-		A1000000000000000000001A /* SectionDivider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionDivider.swift; sourceTree = "<group>"; };
 		A1000000000000000000001B /* StatusPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusPopoverView.swift; sourceTree = "<group>"; };
 		A10000000000000000000042 /* MainWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowView.swift; sourceTree = "<group>"; };
 		A1000000000000000000001C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -275,7 +273,6 @@
 		A1000000000000000000002E /* Components */ = {
 			isa = PBXGroup;
 			children = (
-				A1000000000000000000001A /* SectionDivider.swift */,
 				B300000000000000000000E3 /* SurfaceStyle.swift */,
 				B400000000000000000000E5 /* HeaderProjectPicker.swift */,
 				B500000000000000000000E7 /* KeyEventCatcher.swift */,
@@ -423,7 +420,6 @@
 				A10000000000000000000007 /* ProjectRepository.swift in Sources */,
 				A10000000000000000000008 /* TimeEntryRepository.swift in Sources */,
 				A10000000000000000000009 /* BrutalistTheme.swift in Sources */,
-				A1000000000000000000000A /* SectionDivider.swift in Sources */,
 				A1000000000000000000000B /* StatusPopoverView.swift in Sources */,
 				A10000000000000000000041 /* MainWindowView.swift in Sources */,
 				A10000000000000000000059 /* TimeTracker.swift in Sources */,

@@ -61,36 +61,6 @@ extension BrutalistTheme {
     static func muted(for scheme: ColorScheme) -> Color { dim }
 }
 
-// MARK: - Legacy modifier API
-
-extension View {
-    func brutalistHeading(_ scheme: ColorScheme) -> some View {
-        self
-            .font(BrutalistTheme.headingFont)
-            .foregroundColor(BrutalistTheme.fg)
-            .textCase(.uppercase)
-            .kerning(2.2) // 0.22em at 10pt ≈ 2.2pt
-    }
-
-    func brutalistBody(_ scheme: ColorScheme) -> some View {
-        self
-            .font(BrutalistTheme.bodyFont)
-            .foregroundColor(BrutalistTheme.fg)
-    }
-
-    func brutalistCaption(_ scheme: ColorScheme) -> some View {
-        self
-            .font(BrutalistTheme.captionFont)
-            .foregroundColor(BrutalistTheme.dim2)
-    }
-
-    func brutalistMuted(_ scheme: ColorScheme) -> some View {
-        self
-            .font(BrutalistTheme.captionFont)
-            .foregroundColor(BrutalistTheme.dim)
-    }
-}
-
 // MARK: - Shared components
 
 struct SectionHeader: View {
