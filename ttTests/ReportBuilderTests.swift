@@ -283,4 +283,48 @@ final class ReportBuilderTests: XCTestCase {
 
         XCTAssertEqual(totals[0].seconds, 2 * 3600)
     }
+
+    // MARK: - totalSeconds
+
+    func testTotalSecondsClipsEachEntryToTheRange() {
+        let rangeStart = Date.from(year: 2024, month: 1, day: 2)
+        let rangeEnd = Date.from(year: 2024, month: 1, day: 3)
+        let overnight = TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 23),
+            end: Date.from(year: 2024, month: 1, day: 2, hour: 1)
+        )
+        let within = TimeEntry(
+            projectId: "p2",
+            start: Date.from(year: 2024, month: 1, day: 2, hour: 9),
+            end: Date.from(year: 2024, month: 1, day: 2, hour: 10)
+        )
+
+        let seconds = ReportBuilder.totalSeconds(
+            entries: [overnight, within],
+            rangeStart: rangeStart,
+            rangeEnd: rangeEnd,
+            now: Date.from(year: 2024, month: 1, day: 2, hour: 12)
+        )
+
+        XCTAssertEqual(seconds, 2 * 3600)
+    }
+
+    func testTotalSecondsClosesRunningEntryAtNow() {
+        let rangeStart = Date.from(year: 2024, month: 1, day: 2)
+        let rangeEnd = Date.from(year: 2024, month: 1, day: 3)
+        let running = TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 2, hour: 9)
+        )
+
+        let seconds = ReportBuilder.totalSeconds(
+            entries: [running],
+            rangeStart: rangeStart,
+            rangeEnd: rangeEnd,
+            now: Date.from(year: 2024, month: 1, day: 2, hour: 11)
+        )
+
+        XCTAssertEqual(seconds, 2 * 3600)
+    }
 }

@@ -141,3 +141,67 @@ final class AppStateErrorTests: XCTestCase {
         XCTAssertNil(cleared)
     }
 }
+
+// MARK: - Day Browsing
+
+final class AppStateDayBrowsingTests: XCTestCase {
+    private var dbQueue: DatabaseQueue!
+    private var entryRepository: TimeEntryRepository!
+
+    override func setUp() {
+        super.setUp()
+        dbQueue = try! TestDatabase.makeInMemory()
+        entryRepository = TimeEntryRepository(dbQueue: dbQueue)
+    }
+
+    override func tearDown() {
+        dbQueue = nil
+        entryRepository = nil
+        super.tearDown()
+    }
+
+    @MainActor
+    private func makeAppState() -> AppState {
+        AppState(tracker: TimeTracker(
+            projectRepository: ProjectRepository(dbQueue: dbQueue),
+            timeEntryRepository: entryRepository
+        ))
+    }
+
+    private func time(daysAgo: Int, hour: Int) -> Date {
+        let calendar = Calendar.current
+        let day = calendar.date(byAdding: .day, value: -daysAgo, to: calendar.startOfDay(for: Date()))!
+        return calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day)!
+    }
+
+    @MainActor
+    func testStepDayExposesThePreviousDaysEntries() async throws {
+        let appState = makeAppState()
+        appState.loadInitialState()
+        let projectId = appState.projects[0].id
+        let yesterday = TimeEntry(projectId: projectId, start: time(daysAgo: 1, hour: 9), end: time(daysAgo: 1, hour: 10))
+        let today = TimeEntry(projectId: projectId, start: time(daysAgo: 0, hour: 9), end: time(daysAgo: 0, hour: 10))
+        try entryRepository.insertRunning(entry: yesterday)
+        try entryRepository.insertRunning(entry: today)
+        appState.refreshEntries()
+
+        appState.stepDay(by: -1)
+
+        XCTAssertFalse(appState.isViewingToday)
+        XCTAssertEqual(appState.selectedDay, Calendar.current.startOfDay(for: time(daysAgo: 1, hour: 9)))
+        XCTAssertEqual(appState.visibleEntries.map(\.id), [yesterday.id])
+        XCTAssertEqual(appState.todaysEntries.map(\.id), [today.id])
+    }
+
+    @MainActor
+    func testShowTodayReturnsToTheCurrentDay() async throws {
+        let appState = makeAppState()
+        appState.loadInitialState()
+        appState.stepDay(by: -3)
+
+        appState.showToday()
+
+        XCTAssertTrue(appState.isViewingToday)
+        XCTAssertEqual(appState.selectedDay, Calendar.current.startOfDay(for: Date()))
+    }
+}

@@ -330,6 +330,16 @@ struct MainWindowView: View {
         appState.stepDay(by: step)
     }
 
+    private func todaysTotalSeconds(now: Date = Date()) -> Int {
+        let day = TimeMath.dayRange(for: now)
+        return ReportBuilder.totalSeconds(
+            entries: appState.todaysEntries,
+            rangeStart: day.lowerBound,
+            rangeEnd: day.upperBound,
+            now: now
+        )
+    }
+
     private func visibleDayTotalSeconds(now: Date = Date()) -> Int {
         let day = TimeMath.dayRange(for: appState.selectedDay)
         return ReportBuilder.totalSeconds(

@@ -65,4 +65,25 @@ final class TimeMathTests: XCTestCase {
         XCTAssertEqual(TimeMath.formatHMS(seconds: -1), "00:00:00")
         XCTAssertEqual(TimeMath.formatHMS(seconds: -3600), "00:00:00")
     }
+
+    // MARK: - dayRange
+
+    func testDayRangeCoversTheWholeCalendarDay() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let range = TimeMath.dayRange(for: Date.from(year: 2024, month: 1, day: 2, hour: 17), calendar: calendar)
+
+        XCTAssertEqual(range.lowerBound, Date.from(year: 2024, month: 1, day: 2))
+        XCTAssertEqual(range.upperBound, Date.from(year: 2024, month: 1, day: 3))
+    }
+
+    func testDayRangeSpansTwentyFiveHoursWhenTheClocksGoBack() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Berlin")!
+
+        let range = TimeMath.dayRange(for: Date.from(year: 2024, month: 10, day: 27, hour: 12), calendar: calendar)
+
+        XCTAssertEqual(range.upperBound.timeIntervalSince(range.lowerBound), 25 * 3600)
+    }
 }
