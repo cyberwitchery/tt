@@ -13,6 +13,9 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     @Published private(set) var projects: [Project] = []
     @Published private(set) var runningEntry: TimeEntry?
     @Published private(set) var todaysEntries: [TimeEntry] = []
+    @Published private(set) var visibleEntries: [TimeEntry] = []
+    @Published private(set) var selectedDay: Date = Calendar.current.startOfDay(for: Date())
+    @Published private(set) var isViewingToday: Bool = true
     @Published private(set) var dailyTotals: [ProjectTotal] = []
     @Published private(set) var weeklyTotals: [DayTotal] = []
     @Published private(set) var projectCompletedTotals: [String: Int] = [:]
@@ -69,6 +72,9 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         projects = tracker.projects
         runningEntry = tracker.runningEntry
         todaysEntries = tracker.todaysEntries
+        visibleEntries = tracker.visibleEntries
+        selectedDay = tracker.selectedDay()
+        isViewingToday = tracker.isViewingToday
         dailyTotals = tracker.dailyTotals
         weeklyTotals = tracker.weeklyTotals
         projectCompletedTotals = tracker.projectCompletedTotals
@@ -100,6 +106,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             projects = []
             runningEntry = nil
             todaysEntries = []
+            visibleEntries = []
             dailyTotals = []
             weeklyTotals = []
             projectCompletedTotals = [:]
@@ -181,8 +188,18 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         elapsedSeconds = tracker.elapsedSeconds()
     }
 
-    func refreshTodaysEntries() {
-        tracker.refreshTodaysEntries()
+    func refreshEntries() {
+        tracker.refreshEntries()
+        syncFromTracker()
+    }
+
+    func stepDay(by days: Int) {
+        tracker.stepDay(by: days)
+        syncFromTracker()
+    }
+
+    func showToday() {
+        tracker.goToToday()
         syncFromTracker()
     }
 

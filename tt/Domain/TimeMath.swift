@@ -7,6 +7,13 @@ enum TimeMath {
         return Int(seconds.rounded(.down))
     }
 
+    /// the calendar day `date` falls in, as a half-open range.
+    static func dayRange(for date: Date, calendar: Calendar = .current) -> Range<Date> {
+        let start = calendar.startOfDay(for: date)
+        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start
+        return start..<end
+    }
+
     static func formatHMS(seconds: Int) -> String {
         let clamped = max(0, seconds)
         let hours = clamped / 3600

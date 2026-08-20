@@ -125,10 +125,14 @@ struct StatusPopoverView: View {
         }
     }
 
-    private func todaySeconds() -> Int {
-        appState.todaysEntries.reduce(0) { sum, e in
-            sum + TimeMath.durationSeconds(start: e.start, end: e.end)
-        }
+    private func todaySeconds(now: Date = Date()) -> Int {
+        let day = TimeMath.dayRange(for: now)
+        return ReportBuilder.totalSeconds(
+            entries: appState.todaysEntries,
+            rangeStart: day.lowerBound,
+            rangeEnd: day.upperBound,
+            now: now
+        )
     }
 
     private func weekSeconds() -> Int {

@@ -61,11 +61,8 @@ final class TimeEntryRepository {
         }
     }
 
-    func fetchEntriesForToday(calendar: Calendar = .current) throws -> [TimeEntry] {
-        let startOfDay = calendar.startOfDay(for: Date())
-        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? Date()
-
-        return try fetchEntries(in: startOfDay..<endOfDay)
+    func fetchEntries(onDay day: Date, calendar: Calendar = .current) throws -> [TimeEntry] {
+        try fetchEntries(in: TimeMath.dayRange(for: day, calendar: calendar))
     }
 
     func fetchAll() throws -> [TimeEntry] {

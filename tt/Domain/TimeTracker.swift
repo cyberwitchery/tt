@@ -13,6 +13,8 @@ final class TimeTracker {
     private(set) var projects: [Project] = []
     private(set) var runningEntry: TimeEntry?
     private(set) var todaysEntries: [TimeEntry] = []
+    private(set) var visibleEntries: [TimeEntry] = []
+    private(set) var dayOffset: Int = 0
     private(set) var dailyTotals: [ProjectTotal] = []
     private(set) var weeklyTotals: [DayTotal] = []
     private(set) var projectCompletedTotals: [String: Int] = [:]
@@ -25,6 +27,33 @@ final class TimeTracker {
         guard runningEntry == nil else { return nil }
         guard let last = lastEntryEnd else { return nil }
         return max(0, Int(now.timeIntervalSince(last).rounded(.down)))
+    }
+
+    /// the day the entry list and `dailyTotals` describe. `dayOffset` is a
+    /// count of days back from today, so a selection of today follows the clock
+    /// across midnight.
+    func selectedDay(now: Date = Date(), calendar: Calendar = .current) -> Date {
+        let today = calendar.startOfDay(for: now)
+        guard dayOffset != 0 else { return today }
+        return calendar.date(byAdding: .day, value: dayOffset, to: today) ?? today
+    }
+
+    var isViewingToday: Bool { dayOffset == 0 }
+
+    /// step the selection by `days`, never past today.
+    func stepDay(by days: Int) {
+        let target = min(0, dayOffset + days)
+        guard target != dayOffset else { return }
+        dayOffset = target
+        refreshEntries()
+        refreshReports()
+    }
+
+    func goToToday() {
+        guard dayOffset != 0 else { return }
+        dayOffset = 0
+        refreshEntries()
+        refreshReports()
     }
 
     init(
@@ -43,7 +72,9 @@ final class TimeTracker {
         projects = try projectRepository.fetchAllActive()
         selectedProjectId = defaultProject.id
         runningEntry = try timeEntryRepository.fetchRunning()
-        todaysEntries = try timeEntryRepository.fetchEntriesForToday()
+        dayOffset = 0
+        todaysEntries = try timeEntryRepository.fetchEntries(onDay: Date())
+        visibleEntries = todaysEntries
         refreshReports()
     }
 
@@ -56,7 +87,8 @@ final class TimeTracker {
         let entry = TimeEntry(projectId: projectId, start: Date())
         try timeEntryRepository.insertRunning(entry: entry)
         runningEntry = entry
-        refreshTodaysEntries()
+        dayOffset = 0
+        refreshEntries()
         refreshReports()
         delegate?.timeTrackerDidUpdate()
     }
@@ -65,7 +97,8 @@ final class TimeTracker {
         guard let entry = runningEntry else { return }
         _ = try timeEntryRepository.stopRunning(entry: entry, end: Date())
         runningEntry = nil
-        refreshTodaysEntries()
+        dayOffset = 0
+        refreshEntries()
         refreshReports()
         delegate?.timeTrackerDidUpdate()
     }
@@ -122,7 +155,7 @@ final class TimeTracker {
         try timeEntryRepository.update(entry)
         try timeEntryRepository.resolveMultipleRunningEntries()
         runningEntry = try timeEntryRepository.fetchRunning()
-        refreshTodaysEntries()
+        refreshEntries()
         refreshReports()
         delegate?.timeTrackerDidUpdate()
     }
@@ -130,7 +163,7 @@ final class TimeTracker {
     func deleteEntry(id: String) throws {
         try timeEntryRepository.delete(id: id)
         runningEntry = try timeEntryRepository.fetchRunning()
-        refreshTodaysEntries()
+        refreshEntries()
         refreshReports()
         delegate?.timeTrackerDidUpdate()
     }
@@ -153,28 +186,35 @@ final class TimeTracker {
         refreshReports()
     }
 
-    func refreshTodaysEntries() {
+    func refreshEntries(now: Date = Date(), calendar: Calendar = .current) {
         do {
-            todaysEntries = try timeEntryRepository.fetchEntriesForToday()
+            todaysEntries = try timeEntryRepository.fetchEntries(onDay: now, calendar: calendar)
+            if isViewingToday {
+                visibleEntries = todaysEntries
+            } else {
+                let day = selectedDay(now: now, calendar: calendar)
+                visibleEntries = try timeEntryRepository.fetchEntries(onDay: day, calendar: calendar)
+            }
         } catch {
             todaysEntries = []
+            visibleEntries = []
         }
     }
 
     func refreshReports(now: Date = Date(), calendar: Calendar = .current) {
         do {
-            let startOfDay = calendar.startOfDay(for: now)
-            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? now
-            let weekStart = calendar.date(byAdding: .day, value: -6, to: startOfDay) ?? startOfDay
-            let weekEnd = endOfDay
+            let today = TimeMath.dayRange(for: now, calendar: calendar)
+            let day = TimeMath.dayRange(for: selectedDay(now: now, calendar: calendar), calendar: calendar)
+            let weekStart = calendar.date(byAdding: .day, value: -6, to: today.lowerBound) ?? today.lowerBound
+            let weekEnd = today.upperBound
 
-            let dailyEntries = try timeEntryRepository.fetchEntries(in: startOfDay..<endOfDay)
+            let dailyEntries = try timeEntryRepository.fetchEntries(in: day)
             let weeklyEntries = try timeEntryRepository.fetchEntries(in: weekStart..<weekEnd)
 
             dailyTotals = ReportBuilder.dailyTotals(
                 entries: dailyEntries,
-                rangeStart: startOfDay,
-                rangeEnd: endOfDay,
+                rangeStart: day.lowerBound,
+                rangeEnd: day.upperBound,
                 now: now,
                 projectNameForId: { self.projectName(for: $0) }
             )

@@ -13,6 +13,31 @@ struct DayTotal: Identifiable, Equatable {
 }
 
 enum ReportBuilder {
+    /// seconds of `entry` that fall inside `rangeStart..<rangeEnd`, treating a
+    /// running entry as ending at `now`.
+    static func overlapSeconds(
+        entry: TimeEntry,
+        rangeStart: Date,
+        rangeEnd: Date,
+        now: Date
+    ) -> Int {
+        let end = entry.end ?? now
+        let overlapStart = max(entry.start, rangeStart)
+        let overlapEnd = min(end, rangeEnd)
+        return max(0, Int(overlapEnd.timeIntervalSince(overlapStart).rounded(.down)))
+    }
+
+    static func totalSeconds(
+        entries: [TimeEntry],
+        rangeStart: Date,
+        rangeEnd: Date,
+        now: Date
+    ) -> Int {
+        entries.reduce(0) { sum, entry in
+            sum + overlapSeconds(entry: entry, rangeStart: rangeStart, rangeEnd: rangeEnd, now: now)
+        }
+    }
+
     static func dailyTotals(
         entries: [TimeEntry],
         rangeStart: Date,
@@ -22,11 +47,12 @@ enum ReportBuilder {
     ) -> [ProjectTotal] {
         var totals: [String: Int] = [:]
         for entry in entries {
-            let end = entry.end ?? now
-            let overlapStart = max(entry.start, rangeStart)
-            let overlapEnd = min(end, rangeEnd)
-            let seconds = max(0, Int(overlapEnd.timeIntervalSince(overlapStart).rounded(.down)))
-            totals[entry.projectId, default: 0] += seconds
+            totals[entry.projectId, default: 0] += overlapSeconds(
+                entry: entry,
+                rangeStart: rangeStart,
+                rangeEnd: rangeEnd,
+                now: now
+            )
         }
 
         return totals
@@ -46,13 +72,12 @@ enum ReportBuilder {
                   let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else {
                 continue
             }
-            var seconds = 0
-            for entry in entries {
-                let end = entry.end ?? now
-                let overlapStart = max(entry.start, dayStart)
-                let overlapEnd = min(end, dayEnd)
-                seconds += max(0, Int(overlapEnd.timeIntervalSince(overlapStart).rounded(.down)))
-            }
+            let seconds = totalSeconds(
+                entries: entries,
+                rangeStart: dayStart,
+                rangeEnd: dayEnd,
+                now: now
+            )
             results.append(DayTotal(id: dayStart, date: dayStart, seconds: seconds))
         }
         return results
