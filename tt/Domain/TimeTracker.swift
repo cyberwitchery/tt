@@ -14,6 +14,7 @@ final class TimeTracker {
     private(set) var runningEntry: TimeEntry?
     private(set) var todaysEntries: [TimeEntry] = []
     private(set) var visibleEntries: [TimeEntry] = []
+    /// days back from today. 0 is today.
     private(set) var dayOffset: Int = 0
     private(set) var dailyTotals: [ProjectTotal] = []
     private(set) var weeklyTotals: [DayTotal] = []
@@ -29,9 +30,7 @@ final class TimeTracker {
         return max(0, Int(now.timeIntervalSince(last).rounded(.down)))
     }
 
-    /// the day the entry list and `dailyTotals` describe. `dayOffset` is a
-    /// count of days back from today, so a selection of today follows the clock
-    /// across midnight.
+    /// the day the entry list and `dailyTotals` describe.
     func selectedDay(now: Date = Date(), calendar: Calendar = .current) -> Date {
         let today = calendar.startOfDay(for: now)
         guard dayOffset != 0 else { return today }
