@@ -293,7 +293,7 @@ struct MainWindowView: View {
                 }
                 Spacer()
                 let count = appState.visibleEntries.count
-                let total = visibleDayTotalSeconds()
+                let total = appState.visibleDayTotalSeconds()
                 if count > 0 {
                     Text("\(count) \(count == 1 ? "entry" : "entries") · \(HMS.hoursMinutes(total))")
                         .font(BrutalistTheme.metaFont)
@@ -328,26 +328,6 @@ struct MainWindowView: View {
         guard step < 0 || !appState.isViewingToday else { return }
         clearEdit()
         appState.stepDay(by: step)
-    }
-
-    private func todaysTotalSeconds(now: Date = Date()) -> Int {
-        let day = TimeMath.dayRange(for: now)
-        return ReportBuilder.totalSeconds(
-            entries: appState.todaysEntries,
-            rangeStart: day.lowerBound,
-            rangeEnd: day.upperBound,
-            now: now
-        )
-    }
-
-    private func visibleDayTotalSeconds(now: Date = Date()) -> Int {
-        let day = TimeMath.dayRange(for: appState.selectedDay)
-        return ReportBuilder.totalSeconds(
-            entries: appState.visibleEntries,
-            rangeStart: day.lowerBound,
-            rangeEnd: day.upperBound,
-            now: now
-        )
     }
 
     private func entryRow(_ entry: TimeEntry) -> some View {
@@ -662,7 +642,7 @@ struct MainWindowView: View {
                     .font(BrutalistTheme.bodyFont)
                     .foregroundColor(BrutalistTheme.dim2)
                 DottedLeader()
-                Text(HMS.hoursMinutes(todaysTotalSeconds()))
+                Text(HMS.hoursMinutes(appState.todayTotalSeconds()))
                     .font(BrutalistTheme.bodyFont)
                     .foregroundColor(BrutalistTheme.fg)
                     .monospacedDigit()

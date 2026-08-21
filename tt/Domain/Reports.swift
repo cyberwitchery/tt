@@ -38,6 +38,22 @@ enum ReportBuilder {
         }
     }
 
+    /// seconds of `entries` that fall inside the calendar day containing `day`.
+    static func dayTotalSeconds(
+        entries: [TimeEntry],
+        day: Date,
+        now: Date,
+        calendar: Calendar = .current
+    ) -> Int {
+        let range = TimeMath.dayRange(for: day, calendar: calendar)
+        return totalSeconds(
+            entries: entries,
+            rangeStart: range.lowerBound,
+            rangeEnd: range.upperBound,
+            now: now
+        )
+    }
+
     static func dailyTotals(
         entries: [TimeEntry],
         rangeStart: Date,

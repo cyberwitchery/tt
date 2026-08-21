@@ -88,6 +88,14 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         idleSeconds = tracker.idleSeconds()
     }
 
+    func visibleDayTotalSeconds(now: Date = Date()) -> Int {
+        tracker.visibleDayTotalSeconds(now: now)
+    }
+
+    func todayTotalSeconds(now: Date = Date()) -> Int {
+        tracker.todayTotalSeconds(now: now)
+    }
+
     func projectAllTimeSeconds(for projectId: String) -> Int {
         var seconds = projectCompletedTotals[projectId] ?? 0
         if runningEntry?.projectId == projectId {
@@ -179,9 +187,18 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         idleTimer?.invalidate()
         idleTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.updateIdle()
+                self?.tick()
             }
         }
+    }
+
+    /// the 60s timer body: idle time, plus a reload once the day has rolled over.
+    func tick(now: Date = Date()) {
+        guard tracker.rollOverIfNeeded(now: now) else {
+            updateIdle()
+            return
+        }
+        syncFromTracker()
     }
 
     private func updateElapsed() {

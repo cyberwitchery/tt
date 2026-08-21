@@ -105,7 +105,7 @@ struct StatusPopoverView: View {
                     .foregroundColor(BrutalistTheme.dim)
                     .textCase(.uppercase)
                     .kerning(1.1)
-                Text(HMS.hoursMinutes(todaySeconds()))
+                Text(HMS.hoursMinutes(appState.todayTotalSeconds()))
                     .font(BrutalistTheme.metaFont)
                     .foregroundColor(BrutalistTheme.fg)
                     .monospacedDigit()
@@ -123,16 +123,6 @@ struct StatusPopoverView: View {
             }
             Spacer()
         }
-    }
-
-    private func todaySeconds(now: Date = Date()) -> Int {
-        let day = TimeMath.dayRange(for: now)
-        return ReportBuilder.totalSeconds(
-            entries: appState.todaysEntries,
-            rangeStart: day.lowerBound,
-            rangeEnd: day.upperBound,
-            now: now
-        )
     }
 
     private func weekSeconds() -> Int {

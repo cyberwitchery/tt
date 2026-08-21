@@ -327,4 +327,48 @@ final class ReportBuilderTests: XCTestCase {
 
         XCTAssertEqual(seconds, 2 * 3600)
     }
+
+    // MARK: - dayTotalSeconds
+
+    private var utc: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
+
+    func testDayTotalSecondsSplitsAnEntrySpanningMidnightBetweenBothDays() {
+        let overnight = TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 23),
+            end: Date.from(year: 2024, month: 1, day: 2, hour: 1)
+        )
+        let now = Date.from(year: 2024, month: 1, day: 2, hour: 12)
+
+        XCTAssertEqual(
+            ReportBuilder.dayTotalSeconds(
+                entries: [overnight],
+                day: Date.from(year: 2024, month: 1, day: 1, hour: 8),
+                now: now,
+                calendar: utc
+            ),
+            3600
+        )
+        XCTAssertEqual(
+            ReportBuilder.dayTotalSeconds(entries: [overnight], day: now, now: now, calendar: utc),
+            3600
+        )
+    }
+
+    func testDayTotalSecondsClosesRunningEntryAtNow() {
+        let running = TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 2, hour: 9)
+        )
+        let now = Date.from(year: 2024, month: 1, day: 2, hour: 11)
+
+        XCTAssertEqual(
+            ReportBuilder.dayTotalSeconds(entries: [running], day: now, now: now, calendar: utc),
+            2 * 3600
+        )
+    }
 }
