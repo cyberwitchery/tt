@@ -36,6 +36,12 @@ struct MainWindowView: View {
         return f
     }()
 
+    private static let dayLabelFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EE dd.MM"
+        return f
+    }()
+
     private static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
@@ -56,7 +62,7 @@ struct MainWindowView: View {
                     .padding(.top, 14)
                 BrutalistDivider()
 
-                todaySection
+                entriesSection
                     .zIndex(10) // entry editor's inline project picker floats above projects/reports/export
                 BrutalistDivider()
 
@@ -88,7 +94,10 @@ struct MainWindowView: View {
         static let n: UInt16     = 45
         static let p: UInt16     = 35
         static let e: UInt16     = 14
+        static let t: UInt16     = 17
         static let escape: UInt16 = 53
+        static let leftArrow: UInt16  = 123
+        static let rightArrow: UInt16 = 124
     }
 
     private func handleKey(_ event: NSEvent) -> NSEvent? {
@@ -118,6 +127,16 @@ struct MainWindowView: View {
             if let running = appState.runningEntry {
                 beginEdit(running)
             }
+            return nil
+        case KeyCode.leftArrow: // browse to the previous day
+            showDay(step: -1)
+            return nil
+        case KeyCode.rightArrow: // browse to the next day, never past today
+            showDay(step: 1)
+            return nil
+        case KeyCode.t: // back to today
+            clearEdit()
+            appState.showToday()
             return nil
         case KeyCode.escape: // close open editor/picker/confirm, in priority order
             if editingEntryId != nil { clearEdit(); return nil }
@@ -251,15 +270,30 @@ struct MainWindowView: View {
         return attr
     }
 
-    // MARK: - Today
+    // MARK: - Entries
 
-    private var todaySection: some View {
+    private var entriesSection: some View {
         VStack(alignment: .leading, spacing: BrutalistTheme.rowSpacing) {
-            HStack(alignment: .firstTextBaseline) {
-                SectionHeader(title: "today")
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                BrutalistTextButton(title: "←") { showDay(step: -1) }
+                Button {
+                    clearEdit()
+                    appState.showToday()
+                } label: {
+                    SectionHeader(title: dayLabel)
+                }
+                .buttonStyle(.plain)
+                if appState.isViewingToday {
+                    Text("→")
+                        .font(BrutalistTheme.buttonFont)
+                        .kerning(1.5)
+                        .foregroundColor(BrutalistTheme.colonDim)
+                } else {
+                    BrutalistTextButton(title: "→") { showDay(step: 1) }
+                }
                 Spacer()
-                let count = appState.todaysEntries.count
-                let total = todaysTotalSeconds()
+                let count = appState.visibleEntries.count
+                let total = appState.visibleDayTotalSeconds()
                 if count > 0 {
                     Text("\(count) \(count == 1 ? "entry" : "entries") · \(HMS.hoursMinutes(total))")
                         .font(BrutalistTheme.metaFont)
@@ -269,12 +303,12 @@ struct MainWindowView: View {
                 }
             }
 
-            if appState.todaysEntries.isEmpty {
+            if appState.visibleEntries.isEmpty {
                 Text("no entries")
                     .font(BrutalistTheme.bodyFont)
                     .foregroundColor(BrutalistTheme.dim)
             } else {
-                ForEach(appState.todaysEntries) { entry in
+                ForEach(appState.visibleEntries) { entry in
                     if editingEntryId == entry.id {
                         entryEditor(for: entry)
                     } else {
@@ -285,10 +319,15 @@ struct MainWindowView: View {
         }
     }
 
-    private func todaysTotalSeconds() -> Int {
-        appState.todaysEntries.reduce(0) { sum, entry in
-            sum + TimeMath.durationSeconds(start: entry.start, end: entry.end)
-        }
+    private var dayLabel: String {
+        guard !appState.isViewingToday else { return "today" }
+        return Self.dayLabelFormatter.string(from: appState.selectedDay).lowercased()
+    }
+
+    private func showDay(step: Int) {
+        guard step < 0 || !appState.isViewingToday else { return }
+        clearEdit()
+        appState.stepDay(by: step)
     }
 
     private func entryRow(_ entry: TimeEntry) -> some View {
@@ -603,7 +642,7 @@ struct MainWindowView: View {
                     .font(BrutalistTheme.bodyFont)
                     .foregroundColor(BrutalistTheme.dim2)
                 DottedLeader()
-                Text(HMS.hoursMinutes(todaysTotalSeconds()))
+                Text(HMS.hoursMinutes(appState.todayTotalSeconds()))
                     .font(BrutalistTheme.bodyFont)
                     .foregroundColor(BrutalistTheme.fg)
                     .monospacedDigit()

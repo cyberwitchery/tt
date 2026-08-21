@@ -24,8 +24,8 @@ co-evolved using ai.
 ## usage (mvp)
 
 - click the menu bar `tt` → start/stop timer, pick project, open main window
-- main window: today entries, projects, reports, export csv
-- delete entries immediately from today list
+- main window: entries for any day (`←`/`→` to browse, `t` for today), projects, reports, export csv
+- delete entries immediately from the entry list
 
 * * *
 

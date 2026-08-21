@@ -228,4 +228,271 @@ final class TrackerDerivationsTests: XCTestCase {
         let entry = TimeEntry(projectId: projectId, start: start, end: end)
         try dbQueue.write { db in try entry.insert(db) }
     }
+
+    // MARK: - Selected Day
+
+    private var calendar: Calendar { Calendar.current }
+
+    private func startOfDay(daysAgo: Int) -> Date {
+        let today = calendar.startOfDay(for: Date())
+        return calendar.date(byAdding: .day, value: -daysAgo, to: today)!
+    }
+
+    private func time(daysAgo: Int, hour: Int, minute: Int = 0) -> Date {
+        calendar.date(bySettingHour: hour, minute: minute, second: 0, of: startOfDay(daysAgo: daysAgo))!
+    }
+
+    @discardableResult
+    private func insert(daysAgo: Int, from: Int, to: Int?) throws -> TimeEntry {
+        let entry = TimeEntry(
+            projectId: tracker.projects[0].id,
+            start: time(daysAgo: daysAgo, hour: from),
+            end: to.map { time(daysAgo: daysAgo, hour: $0) }
+        )
+        try timeEntryRepository.insertRunning(entry: entry)
+        return entry
+    }
+
+    func testSelectedDayDefaultsToToday() throws {
+        try tracker.loadInitialState()
+
+        XCTAssertTrue(tracker.isViewingToday)
+        XCTAssertEqual(tracker.selectedDay(), startOfDay(daysAgo: 0))
+    }
+
+    func testStepDayBackShowsThatDaysEntries() throws {
+        try tracker.loadInitialState()
+        let yesterday = try insert(daysAgo: 1, from: 9, to: 10)
+        let today = try insert(daysAgo: 0, from: 9, to: 10)
+        tracker.refreshEntries()
+
+        tracker.stepDay(by: -1)
+
+        XCTAssertFalse(tracker.isViewingToday)
+        XCTAssertEqual(tracker.selectedDay(), startOfDay(daysAgo: 1))
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [yesterday.id])
+        XCTAssertEqual(tracker.todaysEntries.map(\.id), [today.id])
+    }
+
+    func testStepDayForwardIsClampedToToday() throws {
+        try tracker.loadInitialState()
+
+        tracker.stepDay(by: 1)
+        XCTAssertEqual(tracker.dayOffset, 0)
+
+        tracker.stepDay(by: -2)
+        tracker.stepDay(by: 5)
+        XCTAssertEqual(tracker.dayOffset, 0)
+        XCTAssertTrue(tracker.isViewingToday)
+    }
+
+    func testGoToTodayRestoresTodaysEntries() throws {
+        try tracker.loadInitialState()
+        try insert(daysAgo: 2, from: 9, to: 10)
+        let today = try insert(daysAgo: 0, from: 9, to: 10)
+        tracker.refreshEntries()
+
+        tracker.stepDay(by: -2)
+        tracker.goToToday()
+
+        XCTAssertTrue(tracker.isViewingToday)
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [today.id])
+    }
+
+    func testTodaysEntriesStayOnTodayWhileBrowsingBack() throws {
+        try tracker.loadInitialState()
+        try insert(daysAgo: 3, from: 9, to: 17)
+        let today = try insert(daysAgo: 0, from: 9, to: 10)
+        tracker.refreshEntries()
+
+        tracker.stepDay(by: -3)
+
+        XCTAssertEqual(tracker.todaysEntries.map(\.id), [today.id])
+    }
+
+    func testStartTimerReturnsToToday() throws {
+        try tracker.loadInitialState()
+        tracker.stepDay(by: -1)
+
+        try tracker.startTimer()
+
+        XCTAssertTrue(tracker.isViewingToday)
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [tracker.runningEntry!.id])
+    }
+
+    func testStopTimerReturnsToToday() throws {
+        try tracker.loadInitialState()
+        try tracker.startTimer()
+        let entryId = tracker.runningEntry!.id
+        tracker.stepDay(by: -2)
+
+        try tracker.stopTimer()
+
+        XCTAssertTrue(tracker.isViewingToday)
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [entryId])
+    }
+
+    func testDailyTotalsFollowTheSelectedDay() throws {
+        try tracker.loadInitialState()
+        try insert(daysAgo: 1, from: 9, to: 11)
+        try insert(daysAgo: 0, from: 9, to: 10)
+        tracker.refreshReports()
+
+        XCTAssertEqual(tracker.dailyTotals.first?.seconds, 3600)
+
+        tracker.stepDay(by: -1)
+
+        XCTAssertEqual(tracker.dailyTotals.first?.seconds, 2 * 3600)
+    }
+
+    func testEntrySpanningMidnightIsClippedToEachDay() throws {
+        try tracker.loadInitialState()
+        let start = time(daysAgo: 1, hour: 23)
+        let end = time(daysAgo: 0, hour: 1)
+        let entry = TimeEntry(projectId: tracker.projects[0].id, start: start, end: end)
+        try timeEntryRepository.insertRunning(entry: entry)
+        tracker.refreshEntries()
+        tracker.refreshReports()
+
+        let midnight = startOfDay(daysAgo: 0)
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id])
+        XCTAssertEqual(tracker.dailyTotals.first?.seconds, Int(end.timeIntervalSince(midnight)))
+
+        tracker.stepDay(by: -1)
+
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id])
+        XCTAssertEqual(tracker.dailyTotals.first?.seconds, Int(midnight.timeIntervalSince(start)))
+    }
+
+    func testDeleteEntryOnAPastDayKeepsThatDaySelected() throws {
+        try tracker.loadInitialState()
+        let kept = try insert(daysAgo: 1, from: 9, to: 10)
+        let removed = try insert(daysAgo: 1, from: 11, to: 12)
+        tracker.refreshEntries()
+        tracker.stepDay(by: -1)
+
+        try tracker.deleteEntry(id: removed.id)
+
+        XCTAssertFalse(tracker.isViewingToday)
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [kept.id])
+        XCTAssertEqual(tracker.dailyTotals.first?.seconds, 3600)
+    }
+
+    func testEditingAPastEntryLeavesItOnItsOwnDay() throws {
+        try tracker.loadInitialState()
+        let entry = try insert(daysAgo: 1, from: 9, to: 10)
+        tracker.refreshEntries()
+        tracker.stepDay(by: -1)
+
+        let fields = EntryEditor.withEnd(
+            EntryEditor.fields(start: entry.start, end: entry.end),
+            seconds: 11 * 3600
+        )
+        let (start, end) = EntryEditor.resolve(fields, baseDate: entry.start)
+        try tracker.updateEntry(id: entry.id, start: start, end: end, note: "fixed")
+
+        XCTAssertFalse(tracker.isViewingToday)
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id])
+        XCTAssertEqual(tracker.visibleEntries.first?.note, "fixed")
+        XCTAssertEqual(tracker.dailyTotals.first?.seconds, 2 * 3600)
+        XCTAssertTrue(tracker.todaysEntries.isEmpty)
+    }
+
+    func testRunningEntryStartedYesterdayShowsOnBothDays() throws {
+        try tracker.loadInitialState()
+        let entry = TimeEntry(projectId: tracker.projects[0].id, start: time(daysAgo: 1, hour: 23))
+        try timeEntryRepository.insertRunning(entry: entry)
+        tracker.refreshEntries()
+
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id])
+
+        tracker.stepDay(by: -1)
+
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id])
+    }
+
+    // MARK: - Day Totals
+
+    private func insertSpanningMidnight() throws -> (start: Date, end: Date) {
+        let start = time(daysAgo: 1, hour: 23)
+        let end = time(daysAgo: 0, hour: 1)
+        let entry = TimeEntry(projectId: tracker.projects[0].id, start: start, end: end)
+        try timeEntryRepository.insertRunning(entry: entry)
+        return (start, end)
+    }
+
+    func testVisibleDayTotalClipsAnEntrySpanningMidnightToTheSelectedDay() throws {
+        try tracker.loadInitialState()
+        let (start, end) = try insertSpanningMidnight()
+        tracker.refreshEntries()
+
+        let midnight = startOfDay(daysAgo: 0)
+        XCTAssertEqual(tracker.visibleDayTotalSeconds(), Int(end.timeIntervalSince(midnight)))
+
+        tracker.stepDay(by: -1)
+
+        XCTAssertEqual(tracker.visibleDayTotalSeconds(), Int(midnight.timeIntervalSince(start)))
+    }
+
+    func testTodayTotalClipsAnEntrySpanningMidnightToToday() throws {
+        try tracker.loadInitialState()
+        let (_, end) = try insertSpanningMidnight()
+        tracker.refreshEntries()
+
+        XCTAssertEqual(tracker.todayTotalSeconds(), Int(end.timeIntervalSince(startOfDay(daysAgo: 0))))
+    }
+
+    func testTodayTotalStaysOnTodayWhileTheHeaderTotalFollowsTheSelection() throws {
+        try tracker.loadInitialState()
+        try insert(daysAgo: 1, from: 9, to: 12)
+        try insert(daysAgo: 0, from: 9, to: 10)
+        tracker.refreshEntries()
+
+        XCTAssertEqual(tracker.todayTotalSeconds(), 3600)
+        XCTAssertEqual(tracker.visibleDayTotalSeconds(), 3600)
+
+        tracker.stepDay(by: -1)
+
+        XCTAssertEqual(tracker.todayTotalSeconds(), 3600)
+        XCTAssertEqual(tracker.visibleDayTotalSeconds(), 3 * 3600)
+    }
+
+    // MARK: - Midnight Rollover
+
+    func testRollOverMovesTheListOntoTheNewDay() throws {
+        try tracker.loadInitialState()
+        try insert(daysAgo: 1, from: 9, to: 10)
+        tracker.refreshEntries(now: time(daysAgo: 1, hour: 23))
+        XCTAssertEqual(tracker.visibleEntries.count, 1)
+
+        XCTAssertTrue(tracker.rollOverIfNeeded(now: time(daysAgo: 0, hour: 0, minute: 30)))
+
+        XCTAssertTrue(tracker.isViewingToday)
+        XCTAssertEqual(tracker.selectedDay(), startOfDay(daysAgo: 0))
+        XCTAssertTrue(tracker.visibleEntries.isEmpty)
+        XCTAssertTrue(tracker.todaysEntries.isEmpty)
+    }
+
+    func testRollOverHoldsABrowsedDayOnItsOwnDate() throws {
+        try tracker.loadInitialState()
+        let older = try insert(daysAgo: 2, from: 9, to: 10)
+        tracker.stepDay(by: -1)
+        tracker.refreshEntries(now: time(daysAgo: 1, hour: 23))
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [older.id])
+
+        XCTAssertTrue(tracker.rollOverIfNeeded(now: time(daysAgo: 0, hour: 0, minute: 30)))
+
+        XCTAssertEqual(tracker.dayOffset, -2)
+        XCTAssertEqual(tracker.selectedDay(), startOfDay(daysAgo: 2))
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [older.id])
+    }
+
+    func testRollOverDoesNothingUntilTheDayActuallyChanges() throws {
+        XCTAssertFalse(tracker.rollOverIfNeeded(now: time(daysAgo: 0, hour: 9)))
+
+        try tracker.loadInitialState()
+        tracker.refreshEntries(now: time(daysAgo: 0, hour: 9))
+
+        XCTAssertFalse(tracker.rollOverIfNeeded(now: time(daysAgo: 0, hour: 23)))
+    }
 }

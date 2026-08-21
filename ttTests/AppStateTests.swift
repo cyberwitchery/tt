@@ -141,3 +141,120 @@ final class AppStateErrorTests: XCTestCase {
         XCTAssertNil(cleared)
     }
 }
+
+// MARK: - Day Browsing
+
+final class AppStateDayBrowsingTests: XCTestCase {
+    private var dbQueue: DatabaseQueue!
+    private var entryRepository: TimeEntryRepository!
+
+    override func setUp() {
+        super.setUp()
+        dbQueue = try! TestDatabase.makeInMemory()
+        entryRepository = TimeEntryRepository(dbQueue: dbQueue)
+    }
+
+    override func tearDown() {
+        dbQueue = nil
+        entryRepository = nil
+        super.tearDown()
+    }
+
+    private func makeTracker() -> TimeTracker {
+        TimeTracker(
+            projectRepository: ProjectRepository(dbQueue: dbQueue),
+            timeEntryRepository: entryRepository
+        )
+    }
+
+    @MainActor
+    private func makeAppState() -> AppState {
+        AppState(tracker: makeTracker())
+    }
+
+    private func time(daysAgo: Int, hour: Int, minute: Int = 0) -> Date {
+        let calendar = Calendar.current
+        let day = calendar.date(byAdding: .day, value: -daysAgo, to: calendar.startOfDay(for: Date()))!
+        return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day)!
+    }
+
+    @MainActor
+    func testStepDayExposesThePreviousDaysEntries() async throws {
+        let appState = makeAppState()
+        appState.loadInitialState()
+        let projectId = appState.projects[0].id
+        let yesterday = TimeEntry(projectId: projectId, start: time(daysAgo: 1, hour: 9), end: time(daysAgo: 1, hour: 10))
+        let today = TimeEntry(projectId: projectId, start: time(daysAgo: 0, hour: 9), end: time(daysAgo: 0, hour: 10))
+        try entryRepository.insertRunning(entry: yesterday)
+        try entryRepository.insertRunning(entry: today)
+        appState.refreshEntries()
+
+        appState.stepDay(by: -1)
+
+        XCTAssertFalse(appState.isViewingToday)
+        XCTAssertEqual(appState.selectedDay, Calendar.current.startOfDay(for: time(daysAgo: 1, hour: 9)))
+        XCTAssertEqual(appState.visibleEntries.map(\.id), [yesterday.id])
+        XCTAssertEqual(appState.todaysEntries.map(\.id), [today.id])
+    }
+
+    @MainActor
+    func testShowTodayReturnsToTheCurrentDay() async throws {
+        let appState = makeAppState()
+        appState.loadInitialState()
+        appState.stepDay(by: -3)
+
+        appState.showToday()
+
+        XCTAssertTrue(appState.isViewingToday)
+        XCTAssertEqual(appState.selectedDay, Calendar.current.startOfDay(for: Date()))
+    }
+
+    @MainActor
+    func testTheTwoDayTotalsSplitAnEntrySpanningMidnight() async throws {
+        let appState = makeAppState()
+        appState.loadInitialState()
+        let start = time(daysAgo: 1, hour: 23)
+        let end = time(daysAgo: 0, hour: 1)
+        try entryRepository.insertRunning(
+            entry: TimeEntry(projectId: appState.projects[0].id, start: start, end: end)
+        )
+        appState.refreshEntries()
+
+        let midnight = Calendar.current.startOfDay(for: Date())
+        XCTAssertEqual(appState.todayTotalSeconds(), Int(end.timeIntervalSince(midnight)))
+        XCTAssertEqual(appState.visibleDayTotalSeconds(), Int(end.timeIntervalSince(midnight)))
+
+        appState.stepDay(by: -1)
+
+        XCTAssertEqual(appState.todayTotalSeconds(), Int(end.timeIntervalSince(midnight)))
+        XCTAssertEqual(appState.visibleDayTotalSeconds(), Int(midnight.timeIntervalSince(start)))
+    }
+
+    @MainActor
+    func testTickRollsTheEntryListOntoTheNewDay() async throws {
+        let tracker = makeTracker()
+        let appState = AppState(tracker: tracker)
+        appState.loadInitialState()
+        let projectId = appState.projects[0].id
+        let today = TimeEntry(
+            projectId: projectId,
+            start: time(daysAgo: 0, hour: 9),
+            end: time(daysAgo: 0, hour: 10)
+        )
+        try entryRepository.insertRunning(
+            entry: TimeEntry(
+                projectId: projectId,
+                start: time(daysAgo: 1, hour: 9),
+                end: time(daysAgo: 1, hour: 10)
+            )
+        )
+        try entryRepository.insertRunning(entry: today)
+        tracker.refreshEntries(now: time(daysAgo: 1, hour: 23))
+        XCTAssertTrue(appState.visibleEntries.isEmpty)
+
+        appState.tick(now: time(daysAgo: 0, hour: 0, minute: 30))
+
+        XCTAssertEqual(appState.visibleEntries.map(\.id), [today.id])
+        XCTAssertEqual(appState.selectedDay, Calendar.current.startOfDay(for: Date()))
+    }
+}

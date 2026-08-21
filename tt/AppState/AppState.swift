@@ -13,6 +13,9 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     @Published private(set) var projects: [Project] = []
     @Published private(set) var runningEntry: TimeEntry?
     @Published private(set) var todaysEntries: [TimeEntry] = []
+    @Published private(set) var visibleEntries: [TimeEntry] = []
+    @Published private(set) var selectedDay: Date = Calendar.current.startOfDay(for: Date())
+    @Published private(set) var isViewingToday: Bool = true
     @Published private(set) var dailyTotals: [ProjectTotal] = []
     @Published private(set) var weeklyTotals: [DayTotal] = []
     @Published private(set) var projectCompletedTotals: [String: Int] = [:]
@@ -69,6 +72,9 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         projects = tracker.projects
         runningEntry = tracker.runningEntry
         todaysEntries = tracker.todaysEntries
+        visibleEntries = tracker.visibleEntries
+        selectedDay = tracker.selectedDay()
+        isViewingToday = tracker.isViewingToday
         dailyTotals = tracker.dailyTotals
         weeklyTotals = tracker.weeklyTotals
         projectCompletedTotals = tracker.projectCompletedTotals
@@ -80,6 +86,14 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
 
     private func updateIdle() {
         idleSeconds = tracker.idleSeconds()
+    }
+
+    func visibleDayTotalSeconds(now: Date = Date()) -> Int {
+        tracker.visibleDayTotalSeconds(now: now)
+    }
+
+    func todayTotalSeconds(now: Date = Date()) -> Int {
+        tracker.todayTotalSeconds(now: now)
     }
 
     func projectAllTimeSeconds(for projectId: String) -> Int {
@@ -100,6 +114,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             projects = []
             runningEntry = nil
             todaysEntries = []
+            visibleEntries = []
             dailyTotals = []
             weeklyTotals = []
             projectCompletedTotals = [:]
@@ -172,17 +187,36 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         idleTimer?.invalidate()
         idleTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.updateIdle()
+                self?.tick()
             }
         }
+    }
+
+    /// the 60s timer body: idle time, plus a reload once the day has rolled over.
+    func tick(now: Date = Date()) {
+        guard tracker.rollOverIfNeeded(now: now) else {
+            updateIdle()
+            return
+        }
+        syncFromTracker()
     }
 
     private func updateElapsed() {
         elapsedSeconds = tracker.elapsedSeconds()
     }
 
-    func refreshTodaysEntries() {
-        tracker.refreshTodaysEntries()
+    func refreshEntries() {
+        tracker.refreshEntries()
+        syncFromTracker()
+    }
+
+    func stepDay(by days: Int) {
+        tracker.stepDay(by: days)
+        syncFromTracker()
+    }
+
+    func showToday() {
+        tracker.goToToday()
         syncFromTracker()
     }
 

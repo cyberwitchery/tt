@@ -105,7 +105,7 @@ struct StatusPopoverView: View {
                     .foregroundColor(BrutalistTheme.dim)
                     .textCase(.uppercase)
                     .kerning(1.1)
-                Text(HMS.hoursMinutes(todaySeconds()))
+                Text(HMS.hoursMinutes(appState.todayTotalSeconds()))
                     .font(BrutalistTheme.metaFont)
                     .foregroundColor(BrutalistTheme.fg)
                     .monospacedDigit()
@@ -122,12 +122,6 @@ struct StatusPopoverView: View {
                     .monospacedDigit()
             }
             Spacer()
-        }
-    }
-
-    private func todaySeconds() -> Int {
-        appState.todaysEntries.reduce(0) { sum, e in
-            sum + TimeMath.durationSeconds(start: e.start, end: e.end)
         }
     }
 

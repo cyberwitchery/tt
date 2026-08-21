@@ -183,6 +183,94 @@ final class TimeEntryRepositoryTests: XCTestCase {
         XCTAssertEqual(count, 0)
     }
 
+    // MARK: - Fetch Entries on a Day
+
+    private var utcCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
+
+    func testFetchEntriesOnDayReturnsOnlyThatDay() throws {
+        let before = TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 9),
+            end: Date.from(year: 2024, month: 1, day: 1, hour: 10)
+        )
+        let onDay = TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 2, hour: 9),
+            end: Date.from(year: 2024, month: 1, day: 2, hour: 10)
+        )
+        let after = TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 3, hour: 9),
+            end: Date.from(year: 2024, month: 1, day: 3, hour: 10)
+        )
+        try repository.insertRunning(entry: before)
+        try repository.insertRunning(entry: onDay)
+        try repository.insertRunning(entry: after)
+
+        let fetched = try repository.fetchEntries(
+            onDay: Date.from(year: 2024, month: 1, day: 2, hour: 17),
+            calendar: utcCalendar
+        )
+
+        XCTAssertEqual(fetched.map(\.id), [onDay.id])
+    }
+
+    func testFetchEntriesOnDayIncludesEntrySpanningMidnight() throws {
+        let overnight = TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 23),
+            end: Date.from(year: 2024, month: 1, day: 2, hour: 1)
+        )
+        try repository.insertRunning(entry: overnight)
+
+        let first = try repository.fetchEntries(
+            onDay: Date.from(year: 2024, month: 1, day: 1, hour: 12),
+            calendar: utcCalendar
+        )
+        let second = try repository.fetchEntries(
+            onDay: Date.from(year: 2024, month: 1, day: 2, hour: 12),
+            calendar: utcCalendar
+        )
+
+        XCTAssertEqual(first.map(\.id), [overnight.id])
+        XCTAssertEqual(second.map(\.id), [overnight.id])
+    }
+
+    func testFetchEntriesOnDayIncludesStillRunningEntryFromAnEarlierDay() throws {
+        let running = TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 23)
+        )
+        try repository.insertRunning(entry: running)
+
+        let later = try repository.fetchEntries(
+            onDay: Date.from(year: 2024, month: 1, day: 3, hour: 12),
+            calendar: utcCalendar
+        )
+
+        XCTAssertEqual(later.map(\.id), [running.id])
+    }
+
+    func testFetchEntriesOnDayEmptyWhenNothingThatDay() throws {
+        let entry = TimeEntry(
+            projectId: "p1",
+            start: Date.from(year: 2024, month: 1, day: 1, hour: 9),
+            end: Date.from(year: 2024, month: 1, day: 1, hour: 10)
+        )
+        try repository.insertRunning(entry: entry)
+
+        let fetched = try repository.fetchEntries(
+            onDay: Date.from(year: 2024, month: 1, day: 2, hour: 12),
+            calendar: utcCalendar
+        )
+
+        XCTAssertTrue(fetched.isEmpty)
+    }
+
     // MARK: - Fetch Entries in Range
 
     func testFetchEntriesInRange() throws {
