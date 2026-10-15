@@ -116,4 +116,78 @@ final class EntryEditorTests: XCTestCase {
         XCTAssertEqual(start, date(d: 1, h: 23, m: 0))
         XCTAssertEqual(end, date(d: 2, h: 1, m: 0))
     }
+
+    // MARK: - unedited save on daylight-saving days
+
+    private func gregorian(_ zone: String) -> Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: zone)!
+        return cal
+    }
+
+    private func date(_ cal: Calendar, y: Int, mo: Int, d: Int, h: Int, m: Int) -> Date {
+        cal.date(from: DateComponents(year: y, month: mo, day: d, hour: h, minute: m))!
+    }
+
+    /// the commit sequence `MainWindowView.saveEdit` runs on untouched fields, then `resolve`.
+    private func saveUnedited(start: Date, end: Date, calendar cal: Calendar) -> (start: Date, end: Date) {
+        var f = EntryEditor.fields(start: start, end: end, calendar: cal)
+        f = EntryEditor.withStart(f, seconds: f.startSeconds)
+        f = EntryEditor.withEnd(f, seconds: f.endSeconds)
+        f = EntryEditor.withDuration(f, seconds: f.durationSeconds)
+        return EntryEditor.resolve(f, baseDate: start, calendar: cal)
+    }
+
+    func testUneditedSaveKeepsEntryOnBerlinFallBackDay() {
+        let cal = gregorian("Europe/Berlin")
+        let start = date(cal, y: 2026, mo: 10, d: 25, h: 10, m: 0)
+        let end = date(cal, y: 2026, mo: 10, d: 25, h: 11, m: 0)
+        let saved = saveUnedited(start: start, end: end, calendar: cal)
+        XCTAssertEqual(saved.start, start)
+        XCTAssertEqual(saved.end, end)
+    }
+
+    func testUneditedSaveKeepsEntryOnBerlinSpringForwardDay() {
+        let cal = gregorian("Europe/Berlin")
+        let start = date(cal, y: 2026, mo: 3, d: 29, h: 10, m: 0)
+        let end = date(cal, y: 2026, mo: 3, d: 29, h: 11, m: 0)
+        let saved = saveUnedited(start: start, end: end, calendar: cal)
+        XCTAssertEqual(saved.start, start)
+        XCTAssertEqual(saved.end, end)
+    }
+
+    func testUneditedSaveKeepsEntryOnNewYorkSpringForwardDay() {
+        let cal = gregorian("America/New_York")
+        let start = date(cal, y: 2026, mo: 3, d: 8, h: 10, m: 0)
+        let end = date(cal, y: 2026, mo: 3, d: 8, h: 11, m: 0)
+        let saved = saveUnedited(start: start, end: end, calendar: cal)
+        XCTAssertEqual(saved.start, start)
+        XCTAssertEqual(saved.end, end)
+    }
+
+    func testUneditedSaveKeepsEntrySpanningBerlinFallBack() {
+        let cal = gregorian("Europe/Berlin")
+        let start = date(cal, y: 2026, mo: 10, d: 25, h: 1, m: 30)
+        let end = date(cal, y: 2026, mo: 10, d: 25, h: 3, m: 30)
+        XCTAssertEqual(end.timeIntervalSince(start), 3 * 3600)
+        let saved = saveUnedited(start: start, end: end, calendar: cal)
+        XCTAssertEqual(saved.start, start)
+        XCTAssertEqual(saved.end, end)
+    }
+
+    func testResolveStartInSkippedHourLandsAtEndOfGap() {
+        let cal = gregorian("Europe/Berlin")
+        let base = date(cal, y: 2026, mo: 3, d: 29, h: 10, m: 0)
+        let f = EntryEditor.Fields(startSeconds: 2 * 3600 + 30 * 60, endSeconds: 3 * 3600 + 30 * 60, durationSeconds: 3600)
+        let (start, _) = EntryEditor.resolve(f, baseDate: base, calendar: cal)
+        XCTAssertEqual(start, date(y: 2026, mo: 3, d: 29, h: 1, m: 0)) // 03:00 CEST
+    }
+
+    func testResolveStartInRepeatedHourTakesFirstOccurrence() {
+        let cal = gregorian("Europe/Berlin")
+        let base = date(cal, y: 2026, mo: 10, d: 25, h: 10, m: 0)
+        let f = EntryEditor.Fields(startSeconds: 2 * 3600 + 30 * 60, endSeconds: 3 * 3600 + 30 * 60, durationSeconds: 3600)
+        let (start, _) = EntryEditor.resolve(f, baseDate: base, calendar: cal)
+        XCTAssertEqual(start, date(y: 2026, mo: 10, d: 25, h: 0, m: 30)) // 02:30 CEST
+    }
 }

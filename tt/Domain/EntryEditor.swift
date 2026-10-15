@@ -56,9 +56,18 @@ enum EntryEditor {
 
     /// resolve fields back to `(start, end)` Date values anchored to `baseDate`'s day.
     /// the returned `end` may fall on the next calendar day if the duration crosses midnight.
+    /// a start inside a skipped daylight-saving hour resolves to the end of the gap; a repeated one to its first occurrence.
     static func resolve(_ fields: Fields, baseDate: Date, calendar: Calendar = .current) -> (start: Date, end: Date) {
         let dayStart = calendar.startOfDay(for: baseDate)
-        let start = dayStart.addingTimeInterval(TimeInterval(fields.startSeconds))
+        let start = calendar.date(
+            bySettingHour: fields.startSeconds / 3600,
+            minute: fields.startSeconds % 3600 / 60,
+            second: fields.startSeconds % 60,
+            of: dayStart,
+            matchingPolicy: .nextTime,
+            repeatedTimePolicy: .first,
+            direction: .forward
+        ) ?? dayStart.addingTimeInterval(TimeInterval(fields.startSeconds))
         let end = start.addingTimeInterval(TimeInterval(fields.durationSeconds))
         return (start, end)
     }
