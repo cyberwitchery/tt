@@ -174,4 +174,20 @@ final class EntryEditorTests: XCTestCase {
         XCTAssertEqual(saved.start, start)
         XCTAssertEqual(saved.end, end)
     }
+
+    func testResolveStartInSkippedHourLandsAtEndOfGap() {
+        let cal = gregorian("Europe/Berlin")
+        let base = date(cal, y: 2026, mo: 3, d: 29, h: 10, m: 0)
+        let f = EntryEditor.Fields(startSeconds: 2 * 3600 + 30 * 60, endSeconds: 3 * 3600 + 30 * 60, durationSeconds: 3600)
+        let (start, _) = EntryEditor.resolve(f, baseDate: base, calendar: cal)
+        XCTAssertEqual(start, date(y: 2026, mo: 3, d: 29, h: 1, m: 0)) // 03:00 CEST
+    }
+
+    func testResolveStartInRepeatedHourTakesFirstOccurrence() {
+        let cal = gregorian("Europe/Berlin")
+        let base = date(cal, y: 2026, mo: 10, d: 25, h: 10, m: 0)
+        let f = EntryEditor.Fields(startSeconds: 2 * 3600 + 30 * 60, endSeconds: 3 * 3600 + 30 * 60, durationSeconds: 3600)
+        let (start, _) = EntryEditor.resolve(f, baseDate: base, calendar: cal)
+        XCTAssertEqual(start, date(y: 2026, mo: 10, d: 25, h: 0, m: 30)) // 02:30 CEST
+    }
 }
