@@ -14,6 +14,13 @@ enum TimeMath {
         return start..<end
     }
 
+    /// the calendar days from `first` through `last`, in either order, as a half-open range.
+    static func dayRange(from first: Date, through last: Date, calendar: Calendar = .current) -> Range<Date> {
+        let earlier = dayRange(for: min(first, last), calendar: calendar)
+        let later = dayRange(for: max(first, last), calendar: calendar)
+        return earlier.lowerBound..<later.upperBound
+    }
+
     static func formatHMS(seconds: Int) -> String {
         let clamped = max(0, seconds)
         let hours = clamped / 3600

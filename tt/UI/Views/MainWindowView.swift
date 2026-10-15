@@ -751,13 +751,12 @@ struct MainWindowView: View {
     }
 
     private func exportCSV() {
-        let start = min(exportStart, exportEnd)
-        let end = max(exportStart, exportEnd)
+        let range = TimeMath.dayRange(from: exportStart, through: exportEnd)
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType.commaSeparatedText]
         panel.nameFieldStringValue = "tt-export.csv"
         if panel.runModal() == .OK, let url = panel.url {
-            appState.exportCSV(range: start..<end.addingTimeInterval(86400), to: url)
+            appState.exportCSV(range: range, to: url)
         }
     }
 

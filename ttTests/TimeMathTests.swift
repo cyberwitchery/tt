@@ -86,4 +86,26 @@ final class TimeMathTests: XCTestCase {
 
         XCTAssertEqual(range.upperBound.timeIntervalSince(range.lowerBound), 25 * 3600)
     }
+
+    func testDayRangeFromThroughCoversExactlyThePickedDays() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Berlin")!
+        func berlin(_ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0) -> Date {
+            calendar.date(from: DateComponents(year: 2026, month: month, day: day, hour: hour, minute: minute))!
+        }
+
+        let rows: [(name: String, first: Date, last: Date, lower: Date, upper: Date)] = [
+            ("end date with a time of day", berlin(10, 14), berlin(10, 14, 14, 37), berlin(10, 14), berlin(10, 15)),
+            ("reversed dates", berlin(10, 14), berlin(10, 12, 14, 37), berlin(10, 12), berlin(10, 15)),
+            ("fall-back last day", berlin(10, 19), berlin(10, 25), berlin(10, 19), berlin(10, 26)),
+            ("spring-forward last day", berlin(3, 23), berlin(3, 29), berlin(3, 23), berlin(3, 30)),
+            ("plain multi-day span", berlin(10, 5, 9, 30), berlin(10, 9, 17, 45), berlin(10, 5), berlin(10, 10)),
+        ]
+
+        for row in rows {
+            let range = TimeMath.dayRange(from: row.first, through: row.last, calendar: calendar)
+            XCTAssertEqual(range.lowerBound, row.lower, row.name)
+            XCTAssertEqual(range.upperBound, row.upper, row.name)
+        }
+    }
 }
