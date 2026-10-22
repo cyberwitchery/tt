@@ -76,6 +76,7 @@ enum ReportBuilder {
             .sorted { $0.seconds > $1.seconds }
     }
 
+    /// totals for the seven calendar days starting with the one `weekStart` falls in.
     static func weeklyTotals(
         entries: [TimeEntry],
         weekStart: Date,
@@ -83,18 +84,16 @@ enum ReportBuilder {
         calendar: Calendar
     ) -> [DayTotal] {
         var results: [DayTotal] = []
-        for offset in 0..<7 {
-            guard let dayStart = calendar.date(byAdding: .day, value: offset, to: weekStart),
-                  let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else {
-                continue
-            }
+        var day = TimeMath.dayRange(for: weekStart, calendar: calendar)
+        for _ in 0..<7 {
             let seconds = totalSeconds(
                 entries: entries,
-                rangeStart: dayStart,
-                rangeEnd: dayEnd,
+                rangeStart: day.lowerBound,
+                rangeEnd: day.upperBound,
                 now: now
             )
-            results.append(DayTotal(id: dayStart, date: dayStart, seconds: seconds))
+            results.append(DayTotal(id: day.lowerBound, date: day.lowerBound, seconds: seconds))
+            day = TimeMath.dayRange(for: day.upperBound, calendar: calendar)
         }
         return results
     }

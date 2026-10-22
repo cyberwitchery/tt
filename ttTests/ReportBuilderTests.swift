@@ -284,6 +284,24 @@ final class ReportBuilderTests: XCTestCase {
         XCTAssertEqual(totals[0].seconds, 2 * 3600)
     }
 
+    func testWeeklyTotalsStartingOnADayWithoutAMidnightSplitAtEachMidnight() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Santiago")!
+        func santiago(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+            calendar.date(from: DateComponents(year: 2024, month: 9, day: day, hour: hour, minute: minute))!
+        }
+        let entry = TimeEntry(projectId: "p1", start: santiago(9, 0, 30), end: santiago(9, 0, 45))
+
+        let totals = ReportBuilder.weeklyTotals(
+            entries: [entry],
+            weekStart: santiago(8, 1),
+            now: santiago(14, 12),
+            calendar: calendar
+        )
+
+        XCTAssertEqual(totals.map(\.seconds), [0, 15 * 60, 0, 0, 0, 0, 0])
+    }
+
     // MARK: - totalSeconds
 
     func testTotalSecondsClipsEachEntryToTheRange() {
