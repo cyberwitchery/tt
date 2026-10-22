@@ -241,11 +241,11 @@ final class TimeTracker {
         do {
             let today = TimeMath.dayRange(for: now, calendar: calendar)
             let day = TimeMath.dayRange(for: selectedDay(now: now, calendar: calendar), calendar: calendar)
-            let weekStart = calendar.date(byAdding: .day, value: -6, to: today.lowerBound) ?? today.lowerBound
-            let weekEnd = today.upperBound
+            let sixDaysBack = calendar.date(byAdding: .day, value: -6, to: today.lowerBound) ?? today.lowerBound
+            let week = TimeMath.dayRange(from: sixDaysBack, through: now, calendar: calendar)
 
             let dailyEntries = try timeEntryRepository.fetchEntries(in: day)
-            let weeklyEntries = try timeEntryRepository.fetchEntries(in: weekStart..<weekEnd)
+            let weeklyEntries = try timeEntryRepository.fetchEntries(in: week)
 
             dailyTotals = ReportBuilder.dailyTotals(
                 entries: dailyEntries,
@@ -256,7 +256,7 @@ final class TimeTracker {
             )
             weeklyTotals = ReportBuilder.weeklyTotals(
                 entries: weeklyEntries,
-                weekStart: weekStart,
+                weekStart: week.lowerBound,
                 now: now,
                 calendar: calendar
             )

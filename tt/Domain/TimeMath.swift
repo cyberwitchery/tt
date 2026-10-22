@@ -9,9 +9,8 @@ enum TimeMath {
 
     /// the calendar day `date` falls in, as a half-open range.
     static func dayRange(for date: Date, calendar: Calendar = .current) -> Range<Date> {
-        let start = calendar.startOfDay(for: date)
-        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start
-        return start..<end
+        guard let day = calendar.dateInterval(of: .day, for: date) else { return date..<date }
+        return day.start..<day.end
     }
 
     /// the calendar days from `first` through `last`, in either order, as a half-open range.
