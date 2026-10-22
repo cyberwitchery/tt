@@ -315,6 +315,21 @@ final class TimeTrackerTests: XCTestCase {
         XCTAssertEqual(totalSeconds, 2 * 3600)
     }
 
+    func testWeeklyTotalsViewedOnADayWithoutAMidnightStartAtMidnightSixDaysBack() throws {
+        try tracker.loadInitialState()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Santiago")!
+        func santiago(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+            calendar.date(from: DateComponents(year: 2024, month: 9, day: day, hour: hour, minute: minute))!
+        }
+        let entry = TimeEntry(projectId: tracker.projects[0].id, start: santiago(2, 0, 30), end: santiago(2, 0, 45))
+        try timeEntryRepository.insertRunning(entry: entry)
+
+        tracker.refreshReports(now: santiago(8, 12), calendar: calendar)
+
+        XCTAssertEqual(tracker.weeklyTotals.first?.seconds, 15 * 60)
+    }
+
     // MARK: - Export
 
     func testExportCSV() throws {

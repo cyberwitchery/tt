@@ -108,4 +108,24 @@ final class TimeMathTests: XCTestCase {
             XCTAssertEqual(range.upperBound, row.upper, row.name)
         }
     }
+
+    func testDayRangeOfADayWithoutAMidnightEndsAtTheNextMidnight() {
+        let rows: [(zone: String, year: Int, month: Int, day: Int)] = [
+            ("America/Santiago", 2024, 9, 8),
+            ("America/Havana", 2024, 3, 10),
+        ]
+
+        for row in rows {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = TimeZone(identifier: row.zone)!
+            func at(_ day: Int, _ hour: Int) -> Date {
+                calendar.date(from: DateComponents(year: row.year, month: row.month, day: day, hour: hour))!
+            }
+
+            let range = TimeMath.dayRange(for: at(row.day, 12), calendar: calendar)
+
+            XCTAssertEqual(range.lowerBound, at(row.day, 1), row.zone)
+            XCTAssertEqual(range.upperBound, at(row.day + 1, 0), row.zone)
+        }
+    }
 }
