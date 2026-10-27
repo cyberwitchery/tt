@@ -487,6 +487,27 @@ final class TrackerDerivationsTests: XCTestCase {
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [older.id])
     }
 
+    func testRollOverOutOfADayWithoutAMidnightHoldsABrowsedDayOnItsOwnDate() throws {
+        try tracker.loadInitialState()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Santiago")!
+        func santiago(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+            calendar.date(from: DateComponents(year: 2024, month: 9, day: day, hour: hour, minute: minute))!
+        }
+        let older = TimeEntry(projectId: tracker.projects[0].id, start: santiago(7, 9), end: santiago(7, 10))
+        try timeEntryRepository.insertRunning(entry: older)
+        tracker.stepDay(by: -1)
+        tracker.refreshEntries(now: santiago(8, 23), calendar: calendar)
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [older.id])
+
+        let now = santiago(9, 0, 30)
+        XCTAssertTrue(tracker.rollOverIfNeeded(now: now, calendar: calendar))
+
+        XCTAssertEqual(tracker.dayOffset, -2)
+        XCTAssertEqual(tracker.selectedDay(now: now, calendar: calendar), santiago(7, 0))
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [older.id])
+    }
+
     func testRollOverDoesNothingUntilTheDayActuallyChanges() throws {
         XCTAssertFalse(tracker.rollOverIfNeeded(now: time(daysAgo: 0, hour: 9)))
 
