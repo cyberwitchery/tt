@@ -22,7 +22,7 @@ final class TimeTracker {
     private(set) var lastEntryEnd: Date?
     /// the "today" the loaded entry list was fetched against.
     private var loadedDay: Date?
-    /// noon on that day's date, which a time-zone change can't move.
+    /// noon on that day's Gregorian date, which a change of time zone or calendar can't move.
     private var loadedNoon: DateComponents?
     var selectedProjectId: String?
 
@@ -83,7 +83,8 @@ final class TimeTracker {
         guard today != loadedDay else { return false }
 
         if !isViewingToday {
-            let crossed = calendar.dateComponents([.day], from: loadedNoon, to: Self.noon(of: now, calendar)).day ?? 0
+            let gregorian = Self.gregorian(in: calendar)
+            let crossed = gregorian.dateComponents([.day], from: loadedNoon, to: Self.noon(of: now, calendar)).day ?? 0
             dayOffset = min(0, dayOffset - crossed)
         }
         refreshEntries(now: now, calendar: calendar)
@@ -91,8 +92,14 @@ final class TimeTracker {
         return true
     }
 
+    private static func gregorian(in calendar: Calendar) -> Calendar {
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = calendar.timeZone
+        return gregorian
+    }
+
     private static func noon(of date: Date, _ calendar: Calendar) -> DateComponents {
-        var noon = calendar.dateComponents([.era, .year, .month, .day], from: date)
+        var noon = gregorian(in: calendar).dateComponents([.era, .year, .month, .day], from: date)
         noon.hour = 12
         return noon
     }

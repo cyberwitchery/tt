@@ -508,30 +508,30 @@ final class TrackerDerivationsTests: XCTestCase {
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [older.id])
     }
 
-    func testRollOverAfterATimeZoneChangeHoldsABrowsedDayOnItsOwnDate() throws {
-        func calendar(_ zone: String) -> Calendar {
-            var calendar = Calendar(identifier: .gregorian)
+    func testRollOverAfterACalendarChangeHoldsABrowsedDayOnItsOwnDate() throws {
+        func calendar(_ zone: String, _ system: Calendar.Identifier = .gregorian) -> Calendar {
+            var calendar = Calendar(identifier: system)
             calendar.timeZone = TimeZone(identifier: zone)!
             return calendar
         }
-        func november(_ day: Int, _ hour: Int, in calendar: Calendar) -> Date {
-            calendar.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour))!
+        func date(_ month: Int, _ day: Int, _ hour: Int, in zone: String) -> Date {
+            calendar(zone).date(from: DateComponents(year: 2026, month: month, day: day, hour: hour))!
         }
-        let berlin = calendar("Europe/Berlin")
-        let rollOvers: [(zone: String, day: Int, hour: Int)] = [
-            ("Europe/London", 10, 10),
-            ("Asia/Tokyo", 11, 9),
+        let rollOvers: [(loaded: Calendar.Identifier, zone: String, system: Calendar.Identifier, month: Int, day: Int, hour: Int)] = [
+            (.gregorian, "Europe/London", .gregorian, 10, 31, 10),
+            (.gregorian, "Asia/Tokyo", .gregorian, 11, 1, 9),
+            (.buddhist, "Europe/Berlin", .islamicCivil, 11, 1, 9),
         ]
-        for (zone, day, hour) in rollOvers {
+        for (loaded, zone, system, month, day, hour) in rollOvers {
             try tracker.loadInitialState()
             tracker.stepDay(by: -1)
-            tracker.refreshEntries(now: november(10, 10, in: berlin), calendar: berlin)
+            tracker.refreshEntries(now: date(10, 31, 10, in: "Europe/Berlin"), calendar: calendar("Europe/Berlin", loaded))
 
-            let moved = calendar(zone)
-            let now = november(day, hour, in: moved)
+            let moved = calendar(zone, system)
+            let now = date(month, day, hour, in: zone)
             XCTAssertTrue(tracker.rollOverIfNeeded(now: now, calendar: moved), zone)
 
-            XCTAssertEqual(tracker.selectedDay(now: now, calendar: moved), november(9, 0, in: moved), zone)
+            XCTAssertEqual(tracker.selectedDay(now: now, calendar: moved), date(10, 30, 0, in: zone), zone)
         }
     }
 
