@@ -22,6 +22,8 @@ final class TimeTracker {
     private(set) var lastEntryEnd: Date?
     /// the "today" the loaded entry list was fetched against.
     private var loadedDay: Date?
+    /// noon on that day's date, which a time-zone change can't move.
+    private var loadedNoon: DateComponents?
     var selectedProjectId: String?
 
     var startedAt: Date? { runningEntry?.start }
@@ -76,18 +78,23 @@ final class TimeTracker {
     /// browsed day on its own date. true if it reloaded.
     @discardableResult
     func rollOverIfNeeded(now: Date = Date(), calendar: Calendar = .current) -> Bool {
-        guard let loadedDay else { return false }
+        guard let loadedDay, let loadedNoon else { return false }
         let today = calendar.startOfDay(for: now)
         guard today != loadedDay else { return false }
 
         if !isViewingToday {
-            let noon = { calendar.date(bySettingHour: 12, minute: 0, second: 0, of: $0) ?? $0 }
-            let crossed = calendar.dateComponents([.day], from: noon(loadedDay), to: noon(today)).day ?? 0
+            let crossed = calendar.dateComponents([.day], from: loadedNoon, to: Self.noon(of: now, calendar)).day ?? 0
             dayOffset = min(0, dayOffset - crossed)
         }
         refreshEntries(now: now, calendar: calendar)
         refreshReports(now: now, calendar: calendar)
         return true
+    }
+
+    private static func noon(of date: Date, _ calendar: Calendar) -> DateComponents {
+        var noon = calendar.dateComponents([.era, .year, .month, .day], from: date)
+        noon.hour = 12
+        return noon
     }
 
     init(
@@ -109,6 +116,7 @@ final class TimeTracker {
         dayOffset = 0
         let now = Date()
         loadedDay = Calendar.current.startOfDay(for: now)
+        loadedNoon = Self.noon(of: now, .current)
         todaysEntries = try timeEntryRepository.fetchEntries(onDay: now)
         visibleEntries = todaysEntries
         refreshReports()
@@ -224,6 +232,7 @@ final class TimeTracker {
 
     func refreshEntries(now: Date = Date(), calendar: Calendar = .current) {
         loadedDay = calendar.startOfDay(for: now)
+        loadedNoon = Self.noon(of: now, calendar)
         do {
             todaysEntries = try timeEntryRepository.fetchEntries(onDay: now, calendar: calendar)
             if isViewingToday {

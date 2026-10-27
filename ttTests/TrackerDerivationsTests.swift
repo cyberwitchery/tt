@@ -508,6 +508,33 @@ final class TrackerDerivationsTests: XCTestCase {
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [older.id])
     }
 
+    func testRollOverAfterATimeZoneChangeHoldsABrowsedDayOnItsOwnDate() throws {
+        func calendar(_ zone: String) -> Calendar {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = TimeZone(identifier: zone)!
+            return calendar
+        }
+        func november(_ day: Int, _ hour: Int, in calendar: Calendar) -> Date {
+            calendar.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour))!
+        }
+        let berlin = calendar("Europe/Berlin")
+        let rollOvers: [(zone: String, day: Int, hour: Int)] = [
+            ("Europe/London", 10, 10),
+            ("Asia/Tokyo", 11, 9),
+        ]
+        for (zone, day, hour) in rollOvers {
+            try tracker.loadInitialState()
+            tracker.stepDay(by: -1)
+            tracker.refreshEntries(now: november(10, 10, in: berlin), calendar: berlin)
+
+            let moved = calendar(zone)
+            let now = november(day, hour, in: moved)
+            XCTAssertTrue(tracker.rollOverIfNeeded(now: now, calendar: moved), zone)
+
+            XCTAssertEqual(tracker.selectedDay(now: now, calendar: moved), november(9, 0, in: moved), zone)
+        }
+    }
+
     func testRollOverDoesNothingUntilTheDayActuallyChanges() throws {
         XCTAssertFalse(tracker.rollOverIfNeeded(now: time(daysAgo: 0, hour: 9)))
 
