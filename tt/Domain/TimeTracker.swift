@@ -81,7 +81,8 @@ final class TimeTracker {
         guard today != loadedDay else { return false }
 
         if !isViewingToday {
-            let crossed = calendar.dateComponents([.day], from: loadedDay, to: today).day ?? 0
+            let noon = { calendar.date(bySettingHour: 12, minute: 0, second: 0, of: $0) ?? $0 }
+            let crossed = calendar.dateComponents([.day], from: noon(loadedDay), to: noon(today)).day ?? 0
             dayOffset = min(0, dayOffset - crossed)
         }
         refreshEntries(now: now, calendar: calendar)
