@@ -487,6 +487,54 @@ final class TrackerDerivationsTests: XCTestCase {
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [older.id])
     }
 
+    func testRollOverOutOfADayWithoutAMidnightHoldsABrowsedDayOnItsOwnDate() throws {
+        try tracker.loadInitialState()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Santiago")!
+        func santiago(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+            calendar.date(from: DateComponents(year: 2024, month: 9, day: day, hour: hour, minute: minute))!
+        }
+        let older = TimeEntry(projectId: tracker.projects[0].id, start: santiago(7, 9), end: santiago(7, 10))
+        try timeEntryRepository.insertRunning(entry: older)
+        tracker.stepDay(by: -1)
+        tracker.refreshEntries(now: santiago(8, 23), calendar: calendar)
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [older.id])
+
+        let now = santiago(9, 0, 30)
+        XCTAssertTrue(tracker.rollOverIfNeeded(now: now, calendar: calendar))
+
+        XCTAssertEqual(tracker.dayOffset, -2)
+        XCTAssertEqual(tracker.selectedDay(now: now, calendar: calendar), santiago(7, 0))
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [older.id])
+    }
+
+    func testRollOverAfterACalendarChangeHoldsABrowsedDayOnItsOwnDate() throws {
+        func calendar(_ zone: String, _ system: Calendar.Identifier = .gregorian) -> Calendar {
+            var calendar = Calendar(identifier: system)
+            calendar.timeZone = TimeZone(identifier: zone)!
+            return calendar
+        }
+        func date(_ month: Int, _ day: Int, _ hour: Int, in zone: String) -> Date {
+            calendar(zone).date(from: DateComponents(year: 2026, month: month, day: day, hour: hour))!
+        }
+        let rollOvers: [(loaded: Calendar.Identifier, zone: String, system: Calendar.Identifier, month: Int, day: Int, hour: Int)] = [
+            (.gregorian, "Europe/London", .gregorian, 10, 31, 10),
+            (.gregorian, "Asia/Tokyo", .gregorian, 11, 1, 9),
+            (.buddhist, "Europe/Berlin", .islamicCivil, 11, 1, 9),
+        ]
+        for (loaded, zone, system, month, day, hour) in rollOvers {
+            try tracker.loadInitialState()
+            tracker.stepDay(by: -1)
+            tracker.refreshEntries(now: date(10, 31, 10, in: "Europe/Berlin"), calendar: calendar("Europe/Berlin", loaded))
+
+            let moved = calendar(zone, system)
+            let now = date(month, day, hour, in: zone)
+            XCTAssertTrue(tracker.rollOverIfNeeded(now: now, calendar: moved), zone)
+
+            XCTAssertEqual(tracker.selectedDay(now: now, calendar: moved), date(10, 30, 0, in: zone), zone)
+        }
+    }
+
     func testRollOverDoesNothingUntilTheDayActuallyChanges() throws {
         XCTAssertFalse(tracker.rollOverIfNeeded(now: time(daysAgo: 0, hour: 9)))
 
