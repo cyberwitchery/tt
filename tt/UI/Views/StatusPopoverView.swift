@@ -126,7 +126,7 @@ struct StatusPopoverView: View {
     }
 
     private func weekSeconds() -> Int {
-        appState.weeklyTotals.reduce(0) { $0 + $1.seconds }
+        appState.weeklyTotals().reduce(0) { $0 + $1.seconds }
     }
 
     private func colorizeTimer(_ text: String) -> AttributedString {
