@@ -505,8 +505,8 @@ struct MainWindowView: View {
     }
 
     private func saveEdit(_ entry: TimeEntry) {
-        commitStart(); commitEnd(); commitDur()
-        let (start, end) = EntryEditor.resolve(editFields, editing: entry.start, end: entry.end)
+        let fields = EntryEditor.commit(start: editStartText, end: editEndText, duration: editDurText, to: editFields)
+        let (start, end) = EntryEditor.resolve(fields, editing: entry.start, end: entry.end)
         let isRunning = appState.runningEntry?.id == entry.id
         let newProjectId = editProjectId ?? entry.projectId
         appState.updateEntry(
