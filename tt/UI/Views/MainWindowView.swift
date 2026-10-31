@@ -659,14 +659,15 @@ struct MainWindowView: View {
     }
 
     private func weekTotalSeconds() -> Int {
-        appState.weeklyTotals.reduce(0) { $0 + $1.seconds }
+        appState.weeklyTotals().reduce(0) { $0 + $1.seconds }
     }
 
     private var weekChart: some View {
-        let maxSeconds = max(1, appState.weeklyTotals.map(\.seconds).max() ?? 1)
+        let totals = appState.weeklyTotals()
+        let maxSeconds = max(1, totals.map(\.seconds).max() ?? 1)
         let today = Calendar.current.startOfDay(for: Date())
         return HStack(alignment: .bottom, spacing: 6) {
-            ForEach(appState.weeklyTotals) { day in
+            ForEach(totals) { day in
                 let isToday = Calendar.current.isDate(day.date, inSameDayAs: today)
                 VStack(spacing: 4) {
                     ZStack(alignment: .bottom) {

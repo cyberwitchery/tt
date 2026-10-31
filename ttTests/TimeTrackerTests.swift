@@ -311,7 +311,7 @@ final class TimeTrackerTests: XCTestCase {
 
         tracker.refreshReports(now: now, calendar: calendar)
 
-        let totalSeconds = tracker.weeklyTotals.reduce(0) { $0 + $1.seconds }
+        let totalSeconds = tracker.weeklyTotals(now: now, calendar: calendar).reduce(0) { $0 + $1.seconds }
         XCTAssertEqual(totalSeconds, 2 * 3600)
     }
 
@@ -325,9 +325,37 @@ final class TimeTrackerTests: XCTestCase {
         let entry = TimeEntry(projectId: tracker.projects[0].id, start: santiago(2, 0, 30), end: santiago(2, 0, 45))
         try timeEntryRepository.insertRunning(entry: entry)
 
-        tracker.refreshReports(now: santiago(8, 12), calendar: calendar)
+        let now = santiago(8, 12)
+        tracker.refreshReports(now: now, calendar: calendar)
 
-        XCTAssertEqual(tracker.weeklyTotals.first?.seconds, 15 * 60)
+        XCTAssertEqual(tracker.weeklyTotals(now: now, calendar: calendar).first?.seconds, 15 * 60)
+    }
+
+    func testWeeklyTotalsCountARunningTimerUpToEachRead() throws {
+        try tracker.loadInitialState()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        func june(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+            Date.from(year: 2024, month: 6, day: day, hour: hour, minute: minute)
+        }
+        let hour = 3600
+        let day = 24 * hour
+        let timers: [(start: Date, refreshed: Date, read: Date, days: [Int])] = [
+            (june(15, 9), june(15, 9), june(15, 11, 30), [0, 0, 0, 0, 0, 0, 2 * hour + 30 * 60]),
+            (june(14, 23), june(14, 23), june(15, 0, 30), [0, 0, 0, 0, 0, hour, 30 * 60]),
+            (june(5, 12), june(15, 8), june(15, 10), [day, day, day, day, day, day, 10 * hour]),
+        ]
+        for (start, refreshed, read, days) in timers {
+            let entry = TimeEntry(projectId: tracker.projects[0].id, start: start)
+            try timeEntryRepository.insertRunning(entry: entry)
+            tracker.refreshReports(now: refreshed, calendar: calendar)
+
+            XCTAssertEqual(tracker.weeklyTotals(now: read, calendar: calendar).map(\.seconds), days, "\(start)")
+            let hourLater = tracker.weeklyTotals(now: read.addingTimeInterval(3600), calendar: calendar)
+            XCTAssertEqual(hourLater.map(\.seconds).reduce(0, +), days.reduce(0, +) + hour, "\(start)")
+
+            try timeEntryRepository.delete(id: entry.id)
+        }
     }
 
     // MARK: - Export

@@ -17,7 +17,6 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     @Published private(set) var selectedDay: Date = Calendar.current.startOfDay(for: Date())
     @Published private(set) var isViewingToday: Bool = true
     @Published private(set) var dailyTotals: [ProjectTotal] = []
-    @Published private(set) var weeklyTotals: [DayTotal] = []
     @Published private(set) var projectCompletedTotals: [String: Int] = [:]
     @Published private(set) var startedAt: Date?
     @Published private(set) var idleSeconds: Int?
@@ -76,7 +75,6 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         selectedDay = tracker.selectedDay()
         isViewingToday = tracker.isViewingToday
         dailyTotals = tracker.dailyTotals
-        weeklyTotals = tracker.weeklyTotals
         projectCompletedTotals = tracker.projectCompletedTotals
         startedAt = tracker.startedAt
         selectedProjectId = tracker.selectedProjectId
@@ -94,6 +92,10 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
 
     func todayTotalSeconds(now: Date = Date()) -> Int {
         tracker.todayTotalSeconds(now: now)
+    }
+
+    func weeklyTotals(now: Date = Date()) -> [DayTotal] {
+        tracker.weeklyTotals(now: now)
     }
 
     func projectAllTimeSeconds(for projectId: String) -> Int {
@@ -116,7 +118,6 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             todaysEntries = []
             visibleEntries = []
             dailyTotals = []
-            weeklyTotals = []
             projectCompletedTotals = [:]
             startedAt = nil
             idleSeconds = nil
