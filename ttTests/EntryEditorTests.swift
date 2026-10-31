@@ -129,15 +129,24 @@ final class EntryEditorTests: XCTestCase {
         cal.date(from: DateComponents(year: y, month: mo, day: d, hour: h, minute: m))!
     }
 
+    /// `MainWindowView.saveEdit` on an entry `start`-`end` whose editor holds `fields`, every text as last shown.
+    private func save(_ fields: EntryEditor.Fields, start: Date, end: Date?, calendar cal: Calendar) -> (start: Date, end: Date?) {
+        var f = fields
+        for field in [EntryEditor.Field.start, .end, .duration] {
+            f = EntryEditor.commit(EntryEditor.text(field, of: f), to: field, of: f)
+        }
+        return EntryEditor.resolve(f, editing: start, end: end, calendar: cal)
+    }
+
     /// `MainWindowView` opening the editor, pressing Enter in each of `enter`, then saving, with no text changed.
     private func saveUnedited(
         start: Date, end: Date?, enter: [EntryEditor.Field] = [], calendar cal: Calendar
     ) -> (start: Date, end: Date?) {
         var f = EntryEditor.fields(start: start, end: end, calendar: cal)
-        for field in enter + [.start, .end, .duration] {
+        for field in enter {
             f = EntryEditor.commit(EntryEditor.text(field, of: f), to: field, of: f)
         }
-        return EntryEditor.resolve(f, editing: start, end: end, calendar: cal)
+        return save(f, start: start, end: end, calendar: cal)
     }
 
     func testUneditedSaveKeepsEntryDatesExactly() {
@@ -191,6 +200,15 @@ final class EntryEditorTests: XCTestCase {
         let saved = saveUnedited(start: start, end: end, calendar: cal)
         XCTAssertEqual(saved.start, start)
         XCTAssertEqual(saved.end, end)
+    }
+
+    func testEnteringANewEndKeepsTheStartToTheSecond() {
+        let start = date(h: 9, m: 15, s: 42)
+        let end = date(h: 10, m: 20, s: 13)
+        let edited = EntryEditor.commit("11:00", to: .end, of: EntryEditor.fields(start: start, end: end, calendar: calendar))
+        let saved = save(edited, start: start, end: end, calendar: calendar)
+        XCTAssertEqual(saved.start, start)
+        XCTAssertEqual(saved.end, date(h: 11, m: 0))
     }
 
     func testResolveStartInSkippedHourLandsAtEndOfGap() {
