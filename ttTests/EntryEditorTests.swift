@@ -129,13 +129,31 @@ final class EntryEditorTests: XCTestCase {
         cal.date(from: DateComponents(year: y, month: mo, day: d, hour: h, minute: m))!
     }
 
-    /// the commit sequence `MainWindowView.saveEdit` runs on untouched fields, then `resolve`.
-    private func saveUnedited(start: Date, end: Date, calendar cal: Calendar) -> (start: Date, end: Date) {
+    /// `MainWindowView` opening the editor, pressing Enter in each of `enter`, then saving, with no text changed.
+    private func saveUnedited(
+        start: Date, end: Date?, enter: [EntryEditor.Field] = [], calendar cal: Calendar
+    ) -> (start: Date, end: Date?) {
         var f = EntryEditor.fields(start: start, end: end, calendar: cal)
-        f = EntryEditor.withStart(f, seconds: f.startSeconds)
-        f = EntryEditor.withEnd(f, seconds: f.endSeconds)
-        f = EntryEditor.withDuration(f, seconds: f.durationSeconds)
-        return EntryEditor.resolve(f, baseDate: start, calendar: cal)
+        for field in enter + [.start, .end, .duration] {
+            f = EntryEditor.commit(EntryEditor.text(field, of: f), to: field, of: f)
+        }
+        return EntryEditor.resolve(f, editing: start, end: end, calendar: cal)
+    }
+
+    func testUneditedSaveKeepsEntryDatesExactly() {
+        let rows: [(name: String, start: Date, end: Date?, enter: [EntryEditor.Field])] = [
+            ("sub-second timer entry", date(h: 9, m: 15, s: 42) + 0.5, date(h: 10, m: 20, s: 13) + 0.7, []),
+            ("28 s entry", date(h: 9, m: 15, s: 42), date(h: 9, m: 16, s: 10), []),
+            ("26 h entry", date(d: 1, h: 9, m: 0), date(d: 2, h: 11, m: 0), []),
+            ("exactly 24 h entry", date(d: 1, h: 9, m: 0), date(d: 2, h: 9, m: 0), []),
+            ("running entry", date(h: 9, m: 15, s: 42), nil, []),
+            ("Enter in every time field", date(h: 9, m: 15, s: 42), date(h: 10, m: 20, s: 13), [.start, .end, .duration]),
+        ]
+        for row in rows {
+            let saved = saveUnedited(start: row.start, end: row.end, enter: row.enter, calendar: calendar)
+            XCTAssertEqual(saved.start, row.start, row.name)
+            XCTAssertEqual(saved.end, row.end, row.name)
+        }
     }
 
     func testUneditedSaveKeepsEntryOnBerlinFallBackDay() {

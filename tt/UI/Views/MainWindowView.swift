@@ -484,35 +484,29 @@ struct MainWindowView: View {
     }
 
     private func syncEditTexts() {
-        editStartText = formatHHMM(editFields.startSeconds)
-        editEndText = formatHHMM(editFields.endSeconds)
-        editDurText = formatHHMMSS(editFields.durationSeconds)
+        editStartText = EntryEditor.text(.start, of: editFields)
+        editEndText = EntryEditor.text(.end, of: editFields)
+        editDurText = EntryEditor.text(.duration, of: editFields)
     }
 
     private func commitStart() {
-        if let sec = parseHHMM(editStartText) {
-            editFields = EntryEditor.withStart(editFields, seconds: sec)
-        }
+        editFields = EntryEditor.commit(editStartText, to: .start, of: editFields)
         syncEditTexts()
     }
 
     private func commitEnd() {
-        if let sec = parseHHMM(editEndText) {
-            editFields = EntryEditor.withEnd(editFields, seconds: sec)
-        }
+        editFields = EntryEditor.commit(editEndText, to: .end, of: editFields)
         syncEditTexts()
     }
 
     private func commitDur() {
-        if let sec = parseHHMMSS(editDurText) {
-            editFields = EntryEditor.withDuration(editFields, seconds: sec)
-        }
+        editFields = EntryEditor.commit(editDurText, to: .duration, of: editFields)
         syncEditTexts()
     }
 
     private func saveEdit(_ entry: TimeEntry) {
         commitStart(); commitEnd(); commitDur()
-        let (start, end) = EntryEditor.resolve(editFields, baseDate: entry.start)
+        let (start, end) = EntryEditor.resolve(editFields, editing: entry.start, end: entry.end)
         let isRunning = appState.runningEntry?.id == entry.id
         let newProjectId = editProjectId ?? entry.projectId
         appState.updateEntry(
@@ -758,43 +752,5 @@ struct MainWindowView: View {
         if panel.runModal() == .OK, let url = panel.url {
             appState.exportCSV(range: range, to: url)
         }
-    }
-
-    // MARK: - HH:MM parsing
-
-    private func parseHHMM(_ text: String) -> Int? {
-        let parts = text.split(separator: ":").map(String.init)
-        guard parts.count == 2,
-              let h = Int(parts[0]), let m = Int(parts[1]),
-              h >= 0, h < 24, m >= 0, m < 60 else { return nil }
-        return h * 3600 + m * 60
-    }
-
-    private func parseHHMMSS(_ text: String) -> Int? {
-        let parts = text.split(separator: ":").map(String.init)
-        if parts.count == 3,
-           let h = Int(parts[0]), let m = Int(parts[1]), let s = Int(parts[2]),
-           h >= 0, m >= 0, m < 60, s >= 0, s < 60 {
-            return h * 3600 + m * 60 + s
-        }
-        if parts.count == 2,
-           let h = Int(parts[0]), let m = Int(parts[1]),
-           h >= 0, m >= 0, m < 60 {
-            return h * 3600 + m * 60
-        }
-        return nil
-    }
-
-    private func formatHHMM(_ seconds: Int) -> String {
-        let h = (seconds / 3600) % 24
-        let m = (seconds % 3600) / 60
-        return String(format: "%02d:%02d", h, m)
-    }
-
-    private func formatHHMMSS(_ seconds: Int) -> String {
-        let h = seconds / 3600
-        let m = (seconds % 3600) / 60
-        let s = seconds % 60
-        return String(format: "%02d:%02d:%02d", h, m, s)
     }
 }
