@@ -11,6 +11,7 @@ final class TimeTracker {
     weak var delegate: TimeTrackerDelegate?
 
     private(set) var projects: [Project] = []
+    private var allProjectNames: [String: String] = [:]
     private(set) var runningEntry: TimeEntry?
     private(set) var todaysEntries: [TimeEntry] = []
     private(set) var visibleEntries: [TimeEntry] = []
@@ -117,7 +118,7 @@ final class TimeTracker {
     func loadInitialState() throws {
         try timeEntryRepository.resolveMultipleRunningEntries()
         let defaultProject = try projectRepository.ensureDefaultProject()
-        projects = try projectRepository.fetchAllActive()
+        try loadProjects()
         selectedProjectId = defaultProject.id
         runningEntry = try timeEntryRepository.fetchRunning()
         dayOffset = 0
@@ -183,7 +184,7 @@ final class TimeTracker {
     }
 
     func projectName(for projectId: String) -> String {
-        projects.first(where: { $0.id == projectId })?.name.lowercased() ?? "unknown"
+        allProjectNames[projectId] ?? "unknown"
     }
 
     // MARK: - Entry Management
@@ -223,7 +224,7 @@ final class TimeTracker {
 
     func refreshProjects(keepSelection: Bool) {
         do {
-            projects = try projectRepository.fetchAllActive()
+            try loadProjects()
             if keepSelection {
                 return
             }
@@ -233,8 +234,15 @@ final class TimeTracker {
             selectedProjectId = projects.first?.id
         } catch {
             projects = []
+            allProjectNames = [:]
         }
         refreshReports()
+    }
+
+    private func loadProjects() throws {
+        projects = try projectRepository.fetchAllActive()
+        let all = try projectRepository.fetchAll()
+        allProjectNames = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0.name.lowercased()) })
     }
 
     func refreshEntries(now: Date = Date(), calendar: Calendar = .current) {

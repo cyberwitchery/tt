@@ -205,6 +205,25 @@ final class TimeTrackerTests: XCTestCase {
         XCTAssertEqual(name, "unknown")
     }
 
+    func testArchivedProjectKeepsItsName() throws {
+        try tracker.loadInitialState()
+        let project = Project(name: "client")
+        try projectRepository.insert(project)
+        tracker.refreshProjects(keepSelection: true)
+        let start = Date.from(year: 2024, month: 6, day: 15, hour: 9)
+        try timeEntryRepository.insertRunning(
+            entry: TimeEntry(projectId: project.id, start: start, end: start.addingTimeInterval(3600))
+        )
+
+        try tracker.archiveProject(id: project.id)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        tracker.refreshReports(now: start.addingTimeInterval(7200), calendar: calendar)
+
+        XCTAssertEqual(tracker.projectName(for: project.id), "client")
+        XCTAssertEqual(tracker.dailyTotals.map(\.name), ["client"])
+    }
+
     // MARK: - Entry Management
 
     func testUpdateEntry() throws {
