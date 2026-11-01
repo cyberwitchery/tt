@@ -129,12 +129,12 @@ final class EntryEditorTests: XCTestCase {
         cal.date(from: DateComponents(year: y, month: mo, day: d, hour: h, minute: m))!
     }
 
-    /// `MainWindowView.saveEdit` on an entry `start`-`end` whose editor holds `fields`, every text as last shown.
-    private func save(_ fields: EntryEditor.Fields, start: Date, end: Date?, calendar cal: Calendar) -> (start: Date, end: Date?) {
-        var f = fields
-        for field in [EntryEditor.Field.start, .end, .duration] {
-            f = EntryEditor.commit(EntryEditor.text(field, of: f), to: field, of: f)
-        }
+    /// `MainWindowView.saveEdit` on an entry `start`-`end` whose editor holds `fields` and shows `typed` in place of their texts.
+    private func save(
+        _ fields: EntryEditor.Fields, typed: [EntryEditor.Field: String] = [:], start: Date, end: Date?, calendar cal: Calendar
+    ) -> (start: Date, end: Date?) {
+        func shown(_ field: EntryEditor.Field) -> String { typed[field] ?? EntryEditor.text(field, of: fields) }
+        let f = EntryEditor.commit(start: shown(.start), end: shown(.end), duration: shown(.duration), to: fields)
         return EntryEditor.resolve(f, editing: start, end: end, calendar: cal)
     }
 
@@ -209,6 +209,30 @@ final class EntryEditorTests: XCTestCase {
         let saved = save(edited, start: start, end: end, calendar: calendar)
         XCTAssertEqual(saved.start, start)
         XCTAssertEqual(saved.end, date(h: 11, m: 0))
+    }
+
+    func testSaveAppliesTextsTypedWithoutEnter() {
+        let start = date(h: 10, m: 0)
+        let end = date(h: 11, m: 0)
+        let rows: [(name: String, entered: [(EntryEditor.Field, String)], typed: [EntryEditor.Field: String], start: Date, end: Date)] = [
+            ("start", [], [.start: "09:30"], date(h: 9, m: 30), date(h: 10, m: 30)),
+            ("end", [], [.end: "12:00"], start, date(h: 12, m: 0)),
+            ("duration", [], [.duration: "02:00:00"], start, date(h: 12, m: 0)),
+            ("start and end", [], [.start: "09:00", .end: "12:00"], date(h: 9, m: 0), date(h: 12, m: 0)),
+            ("end and duration", [], [.end: "12:00", .duration: "00:30:00"], start, date(h: 10, m: 30)),
+            ("unparseable end", [], [.start: "09:00", .end: "1200", .duration: "02:00:00"], date(h: 9, m: 0), date(h: 11, m: 0)),
+            ("end after an entered start", [(.start, "09:30")], [.end: "12:00"], date(h: 9, m: 30), date(h: 12, m: 0)),
+            ("nothing", [], [:], start, end),
+        ]
+        for row in rows {
+            var f = EntryEditor.fields(start: start, end: end, calendar: calendar)
+            for (field, text) in row.entered {
+                f = EntryEditor.commit(text, to: field, of: f)
+            }
+            let saved = save(f, typed: row.typed, start: start, end: end, calendar: calendar)
+            XCTAssertEqual(saved.start, row.start, row.name)
+            XCTAssertEqual(saved.end, row.end, row.name)
+        }
     }
 
     func testResolveStartInSkippedHourLandsAtEndOfGap() {

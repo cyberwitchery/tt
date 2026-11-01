@@ -93,6 +93,15 @@ enum EntryEditor {
         }
     }
 
+    /// commit each text that differs from what `fields` shows, in the order start, end, duration.
+    static func commit(start: String, end: String, duration: String, to fields: Fields) -> Fields {
+        var edited = fields
+        for (field, text) in [(Field.start, start), (.end, end), (.duration, duration)] where text != self.text(field, of: fields) {
+            edited = commit(text, to: field, of: edited)
+        }
+        return edited
+    }
+
     /// resolve fields edited from the entry `start`-`end`; while they still equal `fields(start:end:)`, the entry's own dates come back.
     static func resolve(_ fields: Fields, editing start: Date, end: Date?, calendar: Calendar = .current) -> (start: Date, end: Date?) {
         if fields == self.fields(start: start, end: end, calendar: calendar) { return (start, end) }
