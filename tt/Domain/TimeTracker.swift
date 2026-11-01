@@ -17,7 +17,7 @@ final class TimeTracker {
     /// days back from today. 0 is today.
     private(set) var dayOffset: Int = 0
     private(set) var dailyTotals: [ProjectTotal] = []
-    private(set) var weeklyTotals: [DayTotal] = []
+    private var weekEntries: [TimeEntry] = []
     private(set) var projectCompletedTotals: [String: Int] = [:]
     private(set) var lastEntryEnd: Date?
     /// the "today" the loaded entry list was fetched against.
@@ -72,6 +72,22 @@ final class TimeTracker {
     /// seconds tracked today, whichever day is selected.
     func todayTotalSeconds(now: Date = Date(), calendar: Calendar = .current) -> Int {
         ReportBuilder.dayTotalSeconds(entries: todaysEntries, day: now, now: now, calendar: calendar)
+    }
+
+    /// seconds tracked on each of the seven days ending on `now`'s day.
+    func weeklyTotals(now: Date = Date(), calendar: Calendar = .current) -> [DayTotal] {
+        ReportBuilder.weeklyTotals(
+            entries: weekEntries,
+            weekStart: Self.week(of: now, calendar).lowerBound,
+            now: now,
+            calendar: calendar
+        )
+    }
+
+    private static func week(of now: Date, _ calendar: Calendar) -> Range<Date> {
+        let today = TimeMath.dayRange(for: now, calendar: calendar)
+        let sixDaysBack = calendar.date(byAdding: .day, value: -6, to: today.lowerBound) ?? today.lowerBound
+        return TimeMath.dayRange(from: sixDaysBack, through: now, calendar: calendar)
     }
 
     /// reload when `now` has crossed midnight since the last fetch, holding a
@@ -256,13 +272,10 @@ final class TimeTracker {
 
     func refreshReports(now: Date = Date(), calendar: Calendar = .current) {
         do {
-            let today = TimeMath.dayRange(for: now, calendar: calendar)
             let day = TimeMath.dayRange(for: selectedDay(now: now, calendar: calendar), calendar: calendar)
-            let sixDaysBack = calendar.date(byAdding: .day, value: -6, to: today.lowerBound) ?? today.lowerBound
-            let week = TimeMath.dayRange(from: sixDaysBack, through: now, calendar: calendar)
 
             let dailyEntries = try timeEntryRepository.fetchEntries(in: day)
-            let weeklyEntries = try timeEntryRepository.fetchEntries(in: week)
+            weekEntries = try timeEntryRepository.fetchEntries(in: Self.week(of: now, calendar))
 
             dailyTotals = ReportBuilder.dailyTotals(
                 entries: dailyEntries,
@@ -271,17 +284,11 @@ final class TimeTracker {
                 now: now,
                 projectNameForId: { self.projectName(for: $0) }
             )
-            weeklyTotals = ReportBuilder.weeklyTotals(
-                entries: weeklyEntries,
-                weekStart: week.lowerBound,
-                now: now,
-                calendar: calendar
-            )
             projectCompletedTotals = (try? timeEntryRepository.fetchCompletedTotalsByProject()) ?? [:]
             lastEntryEnd = (try? timeEntryRepository.fetchMostRecentlyEnded())?.end
         } catch {
             dailyTotals = []
-            weeklyTotals = []
+            weekEntries = []
             projectCompletedTotals = [:]
             lastEntryEnd = nil
         }
