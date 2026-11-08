@@ -1,30 +1,25 @@
 import Foundation
+import Combine
 
-protocol TimeTrackerDelegate: AnyObject {
-    func timeTrackerDidUpdate()
-}
-
-final class TimeTracker {
+final class TimeTracker: ObservableObject {
     private let projectRepository: ProjectRepository
     private let timeEntryRepository: TimeEntryRepository
     let days: DayCalendar
 
-    weak var delegate: TimeTrackerDelegate?
-
-    private(set) var projects: [Project] = []
+    @Published private(set) var projects: [Project] = []
     private var allProjectNames: [String: String] = [:]
-    private(set) var runningEntry: TimeEntry?
-    private(set) var todaysEntries: [TimeEntry] = []
-    private(set) var visibleEntries: [TimeEntry] = []
+    @Published private(set) var runningEntry: TimeEntry?
+    @Published private(set) var todaysEntries: [TimeEntry] = []
+    @Published private(set) var visibleEntries: [TimeEntry] = []
     /// days back from today. 0 is today.
-    private(set) var dayOffset: Int = 0
-    private(set) var dailyTotals: [ProjectTotal] = []
+    @Published private(set) var dayOffset: Int = 0
+    @Published private(set) var dailyTotals: [ProjectTotal] = []
     private var weekEntries: [TimeEntry] = []
-    private(set) var projectCompletedTotals: [String: Int] = [:]
-    private(set) var lastEntryEnd: Date?
+    @Published private(set) var projectCompletedTotals: [String: Int] = [:]
+    @Published private(set) var lastEntryEnd: Date?
     /// the "today" the loaded entry list was fetched against.
     private var loadedDay: DayCalendar.Day?
-    var selectedProjectId: String?
+    @Published var selectedProjectId: String?
 
     var startedAt: Date? { runningEntry?.start }
 
@@ -140,7 +135,6 @@ final class TimeTracker {
         runningEntry = entry
         dayOffset = 0
         reload(at: now)
-        delegate?.timeTrackerDidUpdate()
     }
 
     func stopTimer() throws {
@@ -150,7 +144,6 @@ final class TimeTracker {
         runningEntry = nil
         dayOffset = 0
         reload(at: now)
-        delegate?.timeTrackerDidUpdate()
     }
 
     var isRunning: Bool {
@@ -206,14 +199,12 @@ final class TimeTracker {
         try timeEntryRepository.resolveMultipleRunningEntries()
         runningEntry = try timeEntryRepository.fetchRunning()
         reload(at: days.now)
-        delegate?.timeTrackerDidUpdate()
     }
 
     func deleteEntry(id: String) throws {
         try timeEntryRepository.delete(id: id)
         runningEntry = try timeEntryRepository.fetchRunning()
         reload(at: days.now)
-        delegate?.timeTrackerDidUpdate()
     }
 
     // MARK: - Refresh

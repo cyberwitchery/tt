@@ -227,6 +227,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000013 /* AppState.swift */,
+				A1000000000000000000005A /* TimeTracker.swift */,
 			);
 			path = AppState;
 			sourceTree = "<group>";
@@ -239,7 +240,6 @@
 				C10000000000000000000002 /* DayCalendar.swift */,
 				A10000000000000000000044 /* Reports.swift */,
 				A10000000000000000000046 /* CSVExporter.swift */,
-				A1000000000000000000005A /* TimeTracker.swift */,
 				B200000000000000000000E1 /* EntryEditor.swift */,
 			);
 			path = Domain;

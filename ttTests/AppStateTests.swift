@@ -1,4 +1,5 @@
 import XCTest
+import Combine
 import GRDB
 @testable import tt
 
@@ -182,6 +183,29 @@ final class AppStateDayBrowsingTests: XCTestCase {
     }
 
     @MainActor
+    func testTrackerChangesAreObservedWithoutCopyingState() throws {
+        clock.now = Date.from(year: 2026, month: 1, day: 1, hour: 9)
+        let tracker = makeTracker()
+        let appState = AppState(tracker: tracker)
+        var notifications = 0
+        let observation = appState.objectWillChange.sink { notifications += 1 }
+        defer { observation.cancel() }
+        try tracker.loadInitialState()
+        try tracker.createProject(name: "new")
+        XCTAssertEqual(appState.projects, tracker.projects)
+        XCTAssertGreaterThan(notifications, 0)
+        try tracker.startTimer()
+        let projectId = try XCTUnwrap(tracker.runningEntry?.projectId)
+        clock.now = clock.now.addingTimeInterval(125)
+        XCTAssertEqual(appState.elapsedSeconds, 125)
+        XCTAssertEqual(appState.projectAllTimeSeconds(for: projectId), tracker.projectAllTimeSeconds(for: projectId))
+        XCTAssertEqual(appState.todayTotalSeconds(), 125)
+        try tracker.stopTimer()
+        XCTAssertNil(appState.runningEntry)
+        XCTAssertEqual(appState.projectAllTimeSeconds(for: projectId), 125)
+    }
+
+    @MainActor
     func testStepDayExposesThePreviousDaysEntries() async throws {
         let appState = makeAppState()
         appState.loadInitialState()
@@ -254,7 +278,7 @@ final class AppStateDayBrowsingTests: XCTestCase {
         try entryRepository.insertRunning(entry: today)
         clock.now = time(daysAgo: 1, hour: 23)
         tracker.refreshEntries()
-        XCTAssertTrue(appState.visibleEntries.isEmpty)
+        XCTAssertEqual(appState.visibleEntries.count, 1)
 
         clock.now = time(daysAgo: 0, hour: 0, minute: 30)
         appState.tick()

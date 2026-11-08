@@ -3,7 +3,7 @@ import Combine
 import GRDB
 
 @MainActor
-final class AppState: ObservableObject, TimeTrackerDelegate {
+final class AppState: ObservableObject {
     static let shared = AppState()
 
     private let tracker: TimeTracker
@@ -11,18 +11,18 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     private var timer: Timer?
     private var idleTimer: Timer?
 
-    @Published private(set) var projects: [Project] = []
-    @Published private(set) var runningEntry: TimeEntry?
-    @Published private(set) var todaysEntries: [TimeEntry] = []
-    @Published private(set) var visibleEntries: [TimeEntry] = []
-    @Published private(set) var selectedDay: Date
-    @Published private(set) var isViewingToday: Bool = true
-    @Published private(set) var dailyTotals: [ProjectTotal] = []
-    @Published private(set) var projectCompletedTotals: [String: Int] = [:]
-    @Published private(set) var startedAt: Date?
-    @Published private(set) var idleSeconds: Int?
-    @Published var selectedProjectId: String?
-    @Published var elapsedSeconds: Int = 0
+    private var trackerObservation: AnyCancellable?
+    var projects: [Project] { tracker.projects }
+    var runningEntry: TimeEntry? { tracker.runningEntry }
+    var todaysEntries: [TimeEntry] { tracker.todaysEntries }
+    var visibleEntries: [TimeEntry] { tracker.visibleEntries }
+    var selectedDay: Date { tracker.selectedDay() }
+    var isViewingToday: Bool { tracker.isViewingToday }
+    var dailyTotals: [ProjectTotal] { tracker.dailyTotals }
+    var startedAt: Date? { tracker.startedAt }
+    var idleSeconds: Int? { tracker.idleSeconds() }
+    var selectedProjectId: String? { tracker.selectedProjectId }
+    var elapsedSeconds: Int { tracker.elapsedSeconds() }
     @Published private(set) var lastError: String?
     private var errorDismissTask: Task<Void, Never>?
 
@@ -46,8 +46,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             projectRepository: projectRepository,
             timeEntryRepository: timeEntryRepository
         )
-        selectedDay = tracker.selectedDay()
-        tracker.delegate = self
+        observeTracker()
 
         Task {
             if let dbError {
@@ -60,33 +59,13 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     // for testing only
     init(tracker: TimeTracker) {
         self.tracker = tracker
-        selectedDay = tracker.selectedDay()
-        tracker.delegate = self
+        observeTracker()
     }
 
-    nonisolated func timeTrackerDidUpdate() {
-        Task { @MainActor in
-            syncFromTracker()
+    private func observeTracker() {
+        trackerObservation = tracker.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
         }
-    }
-
-    private func syncFromTracker() {
-        projects = tracker.projects
-        runningEntry = tracker.runningEntry
-        todaysEntries = tracker.todaysEntries
-        visibleEntries = tracker.visibleEntries
-        selectedDay = tracker.selectedDay()
-        isViewingToday = tracker.isViewingToday
-        dailyTotals = tracker.dailyTotals
-        projectCompletedTotals = tracker.projectCompletedTotals
-        startedAt = tracker.startedAt
-        selectedProjectId = tracker.selectedProjectId
-        updateElapsed()
-        updateIdle()
-    }
-
-    private func updateIdle() {
-        idleSeconds = tracker.idleSeconds()
     }
 
     func visibleDayTotalSeconds() -> Int {
@@ -102,28 +81,15 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     }
 
     func projectAllTimeSeconds(for projectId: String) -> Int {
-        var seconds = projectCompletedTotals[projectId] ?? 0
-        if runningEntry?.projectId == projectId {
-            seconds += elapsedSeconds
-        }
-        return seconds
+        tracker.projectAllTimeSeconds(for: projectId)
     }
 
     func loadInitialState() {
         do {
             try tracker.loadInitialState()
-            syncFromTracker()
             restartTimerIfNeeded()
             startIdleTimer()
         } catch {
-            projects = []
-            runningEntry = nil
-            todaysEntries = []
-            visibleEntries = []
-            dailyTotals = []
-            projectCompletedTotals = [:]
-            startedAt = nil
-            idleSeconds = nil
             surfaceError(error)
         }
     }
@@ -131,7 +97,6 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     func startTimer() {
         do {
             try tracker.startTimer()
-            syncFromTracker()
             restartTimerIfNeeded()
         } catch {
             surfaceError(error)
@@ -141,9 +106,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     func stopTimer() {
         do {
             try tracker.stopTimer()
-            syncFromTracker()
             stopTimerUpdates()
-            elapsedSeconds = 0
         } catch {
             surfaceError(error)
         }
@@ -151,13 +114,11 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
 
     func selectProject(id: String) {
         tracker.selectProject(id: id)
-        selectedProjectId = id
     }
 
     func createProject(name: String) {
         do {
             try tracker.createProject(name: name)
-            syncFromTracker()
         } catch {
             surfaceError(error)
         }
@@ -166,7 +127,6 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     func archiveProject(id: String) {
         do {
             try tracker.archiveProject(id: id)
-            syncFromTracker()
         } catch {
             surfaceError(error)
         }
@@ -177,7 +137,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         guard runningEntry != nil else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.updateElapsed()
+                self?.objectWillChange.send()
             }
         }
     }
@@ -196,38 +156,27 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         }
     }
 
-    /// the 60s timer body: idle time, plus a reload once the day has rolled over.
+    /// Refresh derived clock values and reload after a day boundary.
     func tick() {
-        guard tracker.rollOverIfNeeded() else {
-            updateIdle()
-            return
-        }
-        syncFromTracker()
-    }
-
-    private func updateElapsed() {
-        elapsedSeconds = tracker.elapsedSeconds()
+        tracker.rollOverIfNeeded()
+        objectWillChange.send()
     }
 
     func refreshEntries() {
         tracker.refreshEntries()
-        syncFromTracker()
     }
 
     func stepDay(by days: Int) {
         tracker.stepDay(by: days)
-        syncFromTracker()
     }
 
     func showToday() {
         tracker.goToToday()
-        syncFromTracker()
     }
 
     func updateEntry(id: String, start: Date, end: Date?, note: String?, projectId: String? = nil) {
         do {
             try tracker.updateEntry(id: id, start: start, end: end, note: note, projectId: projectId)
-            syncFromTracker()
             restartTimerIfNeeded()
         } catch {
             surfaceError(error)
@@ -237,7 +186,6 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     func deleteEntry(id: String) {
         do {
             try tracker.deleteEntry(id: id)
-            syncFromTracker()
             restartTimerIfNeeded()
         } catch {
             surfaceError(error)
@@ -246,7 +194,6 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
 
     func refreshProjects(keepSelection: Bool) {
         tracker.refreshProjects(keepSelection: keepSelection)
-        syncFromTracker()
     }
 
     func projectName(for projectId: String) -> String {
@@ -255,7 +202,6 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
 
     func refreshReports() {
         tracker.refreshReports()
-        syncFromTracker()
     }
 
     func exportCSV(range: Range<Date>, to url: URL) {
