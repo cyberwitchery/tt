@@ -297,3 +297,66 @@ final class EntryEditorTests: XCTestCase {
         XCTAssertEqual(f.start, date(y: 2026, mo: 10, d: 25, h: 0, m: 30)) // 02:30 CEST
     }
 }
+
+final class EntryEditSessionTests: XCTestCase {
+    private func session() -> EntryEditSession {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return EntryEditSession(days: DayCalendar(calendar: { calendar }))
+    }
+
+    func testSaveAppliesAllTypedFieldsAndProjectFallback() throws {
+        let start = Date.from(year: 2026, month: 1, day: 1, hour: 9)
+        let entry = TimeEntry(projectId: "original", start: start, end: start + 3600)
+        var session = session()
+        session.begin(entry)
+        session.startText = "08:00"
+        session.endText = "11:00"
+        session.durationText = "02:00:00"
+        session.projectId = nil
+        session.note = "updated"
+        let update = try XCTUnwrap(session.update(runningEntryId: nil))
+        XCTAssertEqual(update.id, entry.id)
+        XCTAssertEqual(update.start, start - 3600)
+        XCTAssertEqual(update.end, start + 3600)
+        XCTAssertEqual(update.projectId, "original")
+        XCTAssertEqual(update.note, "updated")
+        session.projectId = "new"
+        XCTAssertEqual(session.update(runningEntryId: nil)?.projectId, "new")
+    }
+
+    func testRunningEntryStaysRunningAfterEndAndDurationEdits() {
+        let entry = TimeEntry(projectId: "p", start: Date.from(year: 2026, month: 1, day: 1, hour: 9))
+        var session = session()
+        session.begin(entry)
+        session.endText = "12:00"
+        session.durationText = "02:00:00"
+        XCTAssertNil(session.update(runningEntryId: entry.id)?.end)
+        XCTAssertNotNil(session.update(runningEntryId: nil)?.end)
+    }
+
+    func testCommitSynchronizesTextsAndClearResetsEverything() {
+        let start = Date.from(year: 2026, month: 1, day: 1, hour: 9)
+        let entry = TimeEntry(projectId: "p", start: start, end: start + 3600, note: "old")
+        var session = session()
+        session.begin(entry)
+        session.startText = "08:00"
+        session.commit(.start)
+        XCTAssertEqual(session.endText, "09:00")
+        XCTAssertEqual(session.durationText, "01:00:00")
+        session.projectPickerOpen = true
+        session.clear()
+        XCTAssertNil(session.entryId)
+        XCTAssertNil(session.projectId)
+        XCTAssertEqual(session.note, "")
+        XCTAssertEqual(session.startText, "")
+        XCTAssertEqual(session.endText, "")
+        XCTAssertEqual(session.durationText, "")
+        XCTAssertFalse(session.projectPickerOpen)
+        XCTAssertNil(session.update(runningEntryId: nil))
+        session.begin(TimeEntry(projectId: "second", start: start))
+        XCTAssertEqual(session.note, "")
+        XCTAssertEqual(session.durationText, "00:00:00")
+        XCTAssertEqual(session.projectId, "second")
+    }
+}
