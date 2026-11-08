@@ -2,6 +2,13 @@ import Foundation
 import GRDB
 @testable import tt
 
+final class TestClock {
+    var now = Date()
+    var calendar = Calendar.current
+
+    var days: DayCalendar { DayCalendar(calendar: { self.calendar }, now: { self.now }) }
+}
+
 enum TestDatabase {
     static func makeInMemory() throws -> DatabaseQueue {
         let dbQueue = try DatabaseQueue()

@@ -7,6 +7,7 @@ protocol TimeTrackerDelegate: AnyObject {
 final class TimeTracker {
     private let projectRepository: ProjectRepository
     private let timeEntryRepository: TimeEntryRepository
+    let days: DayCalendar
 
     weak var delegate: TimeTrackerDelegate?
 
@@ -22,111 +23,93 @@ final class TimeTracker {
     private(set) var projectCompletedTotals: [String: Int] = [:]
     private(set) var lastEntryEnd: Date?
     /// the "today" the loaded entry list was fetched against.
-    private var loadedDay: Date?
-    /// noon on that day's Gregorian date, which a change of time zone or calendar can't move.
-    private var loadedNoon: DateComponents?
+    private var loadedDay: DayCalendar.Day?
     var selectedProjectId: String?
 
     var startedAt: Date? { runningEntry?.start }
 
-    func idleSeconds(now: Date = Date()) -> Int? {
+    func idleSeconds() -> Int? {
         guard runningEntry == nil else { return nil }
         guard let last = lastEntryEnd else { return nil }
-        return max(0, Int(now.timeIntervalSince(last).rounded(.down)))
+        return max(0, Int(days.now.timeIntervalSince(last).rounded(.down)))
     }
 
     /// the day the entry list and `dailyTotals` describe.
-    func selectedDay(now: Date = Date(), calendar: Calendar = .current) -> Date {
-        let today = calendar.startOfDay(for: now)
-        guard dayOffset != 0 else { return today }
-        return calendar.date(byAdding: .day, value: dayOffset, to: today) ?? today
+    func selectedDay() -> Date {
+        selectedDay(at: days.now).start
+    }
+
+    private func selectedDay(at now: Date) -> DayCalendar.Day {
+        days.day(byAdding: dayOffset, to: days.day(containing: now))
     }
 
     var isViewingToday: Bool { dayOffset == 0 }
 
     /// step the selection by `days`, never past today.
-    func stepDay(by days: Int) {
-        let target = min(0, dayOffset + days)
+    func stepDay(by offset: Int) {
+        let target = min(0, dayOffset + offset)
         guard target != dayOffset else { return }
         dayOffset = target
-        refreshEntries()
-        refreshReports()
+        reload(at: days.now)
     }
 
     func goToToday() {
         guard dayOffset != 0 else { return }
         dayOffset = 0
-        refreshEntries()
-        refreshReports()
+        reload(at: days.now)
     }
 
     /// seconds tracked on the selected day, clipped to it.
-    func visibleDayTotalSeconds(now: Date = Date(), calendar: Calendar = .current) -> Int {
-        ReportBuilder.dayTotalSeconds(
+    func visibleDayTotalSeconds() -> Int {
+        let now = days.now
+        return ReportBuilder.dayTotalSeconds(
             entries: visibleEntries,
-            day: selectedDay(now: now, calendar: calendar),
-            now: now,
-            calendar: calendar
+            day: selectedDay(at: now),
+            now: now
         )
     }
 
     /// seconds tracked today, whichever day is selected.
-    func todayTotalSeconds(now: Date = Date(), calendar: Calendar = .current) -> Int {
-        ReportBuilder.dayTotalSeconds(entries: todaysEntries, day: now, now: now, calendar: calendar)
+    func todayTotalSeconds() -> Int {
+        let now = days.now
+        return ReportBuilder.dayTotalSeconds(entries: todaysEntries, day: days.day(containing: now), now: now)
     }
 
     /// seconds tracked on each of the seven days ending on `now`'s day.
-    func weeklyTotals(now: Date = Date(), calendar: Calendar = .current) -> [DayTotal] {
-        ReportBuilder.weeklyTotals(
+    func weeklyTotals() -> [DayTotal] {
+        let now = days.now
+        return ReportBuilder.weeklyTotals(
             entries: weekEntries,
-            weekStart: Self.week(of: now, calendar).lowerBound,
-            now: now,
-            calendar: calendar
+            week: days.week(endingOn: now),
+            now: now
         )
-    }
-
-    private static func week(of now: Date, _ calendar: Calendar) -> Range<Date> {
-        let today = TimeMath.dayRange(for: now, calendar: calendar)
-        let sixDaysBack = calendar.date(byAdding: .day, value: -6, to: today.lowerBound) ?? today.lowerBound
-        return TimeMath.dayRange(from: sixDaysBack, through: now, calendar: calendar)
     }
 
     /// reload when `now` has crossed midnight since the last fetch, holding a
     /// browsed day on its own date. true if it reloaded.
     @discardableResult
-    func rollOverIfNeeded(now: Date = Date(), calendar: Calendar = .current) -> Bool {
-        guard let loadedDay, let loadedNoon else { return false }
-        let today = calendar.startOfDay(for: now)
+    func rollOverIfNeeded() -> Bool {
+        guard let loadedDay else { return false }
+        let now = days.now
+        let today = days.day(containing: now)
         guard today != loadedDay else { return false }
 
         if !isViewingToday {
-            let gregorian = Self.gregorian(in: calendar)
-            let crossed = gregorian.dateComponents([.day], from: loadedNoon, to: Self.noon(of: now, calendar)).day ?? 0
+            let crossed = days.daysBetween(loadedDay, and: today)
             dayOffset = min(0, dayOffset - crossed)
         }
-        refreshEntries(now: now, calendar: calendar)
-        refreshReports(now: now, calendar: calendar)
+        reload(at: now)
         return true
-    }
-
-    private static func gregorian(in calendar: Calendar) -> Calendar {
-        var gregorian = Calendar(identifier: .gregorian)
-        gregorian.timeZone = calendar.timeZone
-        return gregorian
-    }
-
-    private static func noon(of date: Date, _ calendar: Calendar) -> DateComponents {
-        var noon = gregorian(in: calendar).dateComponents([.era, .year, .month, .day], from: date)
-        noon.hour = 12
-        return noon
     }
 
     init(
         projectRepository: ProjectRepository,
-        timeEntryRepository: TimeEntryRepository
+        timeEntryRepository: TimeEntryRepository,
+        days: DayCalendar = DayCalendar()
     ) {
         self.projectRepository = projectRepository
         self.timeEntryRepository = timeEntryRepository
+        self.days = days
     }
 
     // MARK: - Initial Load
@@ -138,12 +121,11 @@ final class TimeTracker {
         selectedProjectId = defaultProject.id
         runningEntry = try timeEntryRepository.fetchRunning()
         dayOffset = 0
-        let now = Date()
-        loadedDay = Calendar.current.startOfDay(for: now)
-        loadedNoon = Self.noon(of: now, .current)
-        todaysEntries = try timeEntryRepository.fetchEntries(onDay: now)
+        let now = days.now
+        loadedDay = days.day(containing: now)
+        todaysEntries = try timeEntryRepository.fetchEntries(on: days.day(containing: now))
         visibleEntries = todaysEntries
-        refreshReports()
+        refreshReports(at: now)
     }
 
     // MARK: - Timer Control
@@ -152,22 +134,22 @@ final class TimeTracker {
         guard runningEntry == nil else { return }
         guard let projectId = selectedProjectId else { return }
 
-        let entry = TimeEntry(projectId: projectId, start: Date())
+        let now = days.now
+        let entry = TimeEntry(projectId: projectId, start: now)
         try timeEntryRepository.insertRunning(entry: entry)
         runningEntry = entry
         dayOffset = 0
-        refreshEntries()
-        refreshReports()
+        reload(at: now)
         delegate?.timeTrackerDidUpdate()
     }
 
     func stopTimer() throws {
         guard let entry = runningEntry else { return }
-        _ = try timeEntryRepository.stopRunning(entry: entry, end: Date())
+        let now = days.now
+        _ = try timeEntryRepository.stopRunning(entry: entry, end: now)
         runningEntry = nil
         dayOffset = 0
-        refreshEntries()
-        refreshReports()
+        reload(at: now)
         delegate?.timeTrackerDidUpdate()
     }
 
@@ -175,9 +157,9 @@ final class TimeTracker {
         runningEntry != nil
     }
 
-    func elapsedSeconds(now: Date = Date()) -> Int {
+    func elapsedSeconds() -> Int {
         guard let entry = runningEntry else { return 0 }
-        return TimeMath.durationSeconds(start: entry.start, end: entry.end, now: now)
+        return TimeMath.durationSeconds(start: entry.start, end: entry.end, now: days.now)
     }
 
     // MARK: - Project Management
@@ -223,16 +205,14 @@ final class TimeTracker {
         try timeEntryRepository.update(entry)
         try timeEntryRepository.resolveMultipleRunningEntries()
         runningEntry = try timeEntryRepository.fetchRunning()
-        refreshEntries()
-        refreshReports()
+        reload(at: days.now)
         delegate?.timeTrackerDidUpdate()
     }
 
     func deleteEntry(id: String) throws {
         try timeEntryRepository.delete(id: id)
         runningEntry = try timeEntryRepository.fetchRunning()
-        refreshEntries()
-        refreshReports()
+        reload(at: days.now)
         delegate?.timeTrackerDidUpdate()
     }
 
@@ -261,16 +241,18 @@ final class TimeTracker {
         allProjectNames = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0.name.lowercased()) })
     }
 
-    func refreshEntries(now: Date = Date(), calendar: Calendar = .current) {
-        loadedDay = calendar.startOfDay(for: now)
-        loadedNoon = Self.noon(of: now, calendar)
+    func refreshEntries() {
+        refreshEntries(at: days.now)
+    }
+
+    private func refreshEntries(at now: Date) {
+        loadedDay = days.day(containing: now)
         do {
-            todaysEntries = try timeEntryRepository.fetchEntries(onDay: now, calendar: calendar)
+            todaysEntries = try timeEntryRepository.fetchEntries(on: days.day(containing: now))
             if isViewingToday {
                 visibleEntries = todaysEntries
             } else {
-                let day = selectedDay(now: now, calendar: calendar)
-                visibleEntries = try timeEntryRepository.fetchEntries(onDay: day, calendar: calendar)
+                visibleEntries = try timeEntryRepository.fetchEntries(on: selectedDay(at: now))
             }
         } catch {
             todaysEntries = []
@@ -278,12 +260,21 @@ final class TimeTracker {
         }
     }
 
-    func refreshReports(now: Date = Date(), calendar: Calendar = .current) {
+    func refreshReports() {
+        refreshReports(at: days.now)
+    }
+
+    private func reload(at now: Date) {
+        refreshEntries(at: now)
+        refreshReports(at: now)
+    }
+
+    private func refreshReports(at now: Date) {
         do {
-            let day = TimeMath.dayRange(for: selectedDay(now: now, calendar: calendar), calendar: calendar)
+            let day = selectedDay(at: now).range
 
             let dailyEntries = try timeEntryRepository.fetchEntries(in: day)
-            weekEntries = try timeEntryRepository.fetchEntries(in: Self.week(of: now, calendar))
+            weekEntries = try timeEntryRepository.fetchEntries(in: days.week(endingOn: now).range)
 
             dailyTotals = ReportBuilder.dailyTotals(
                 entries: dailyEntries,
@@ -302,22 +293,22 @@ final class TimeTracker {
         }
     }
 
-    func projectAllTimeSeconds(for projectId: String, now: Date = Date()) -> Int {
+    func projectAllTimeSeconds(for projectId: String) -> Int {
         var seconds = projectCompletedTotals[projectId] ?? 0
         if let entry = runningEntry, entry.projectId == projectId {
-            seconds += TimeMath.durationSeconds(start: entry.start, end: entry.end, now: now)
+            seconds += TimeMath.durationSeconds(start: entry.start, end: entry.end, now: days.now)
         }
         return seconds
     }
 
     // MARK: - Export
 
-    func exportCSV(range: Range<Date>, to url: URL, now: Date = Date()) throws {
+    func exportCSV(range: Range<Date>, to url: URL) throws {
         let entries = try timeEntryRepository.fetchEntries(in: range)
         let allProjects = try projectRepository.fetchAll()
         let projectNames = Dictionary(uniqueKeysWithValues: allProjects.map { ($0.id, $0.name.lowercased()) })
 
-        let output = CSVExporter.buildCSV(entries: entries, projectNames: projectNames, now: now)
+        let output = CSVExporter.buildCSV(entries: entries, projectNames: projectNames, now: days.now)
         try output.write(to: url, atomically: true, encoding: .utf8)
     }
 }

@@ -12,109 +12,112 @@ final class EntryEditorTests: XCTestCase {
         calendar.date(from: DateComponents(year: y, month: mo, day: d, hour: h, minute: m, second: s))!
     }
 
+    private func makeEditor(calendar: Calendar) -> EntryEditor {
+        EntryEditor(days: DayCalendar(calendar: { calendar }))
+    }
+
+    private var editor: EntryEditor { makeEditor(calendar: calendar) }
+
     // MARK: - fields(start:end:)
 
     func testFieldsFromStartAndEnd() {
         let start = date(h: 9, m: 30)
         let end = date(h: 11, m: 45)
-        let f = EntryEditor.fields(start: start, end: end, calendar: calendar)
-        XCTAssertEqual(f.startSeconds, 9 * 3600 + 30 * 60)
-        XCTAssertEqual(f.endSeconds, 11 * 3600 + 45 * 60)
+        let f = editor.fields(start: start, end: end)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.start), 9 * 3600 + 30 * 60)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.end ?? f.start), 11 * 3600 + 45 * 60)
         XCTAssertEqual(f.durationSeconds, 2 * 3600 + 15 * 60)
     }
 
     func testFieldsFromRunningEntryHasZeroDuration() {
         let start = date(h: 14, m: 0)
-        let f = EntryEditor.fields(start: start, end: nil, calendar: calendar)
-        XCTAssertEqual(f.startSeconds, 14 * 3600)
-        XCTAssertEqual(f.endSeconds, 14 * 3600)
+        let f = editor.fields(start: start, end: nil)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.start), 14 * 3600)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.end ?? f.start), 14 * 3600)
         XCTAssertEqual(f.durationSeconds, 0)
     }
 
-    func testFieldsFromCrossMidnightEntryCapsAtOneDay() {
+    func testFieldsFromCrossMidnightEntry() {
         let start = date(d: 1, h: 23, m: 50)
         let end = date(d: 2, h: 0, m: 10)
-        let f = EntryEditor.fields(start: start, end: end, calendar: calendar)
-        XCTAssertEqual(f.startSeconds, 23 * 3600 + 50 * 60)
-        XCTAssertEqual(f.endSeconds, 10 * 60)
+        let f = editor.fields(start: start, end: end)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.start), 23 * 3600 + 50 * 60)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.end ?? f.start), 10 * 60)
         XCTAssertEqual(f.durationSeconds, 20 * 60)
     }
 
     // MARK: - withStart
 
     func testWithStartHoldsDurationAndShiftsEnd() {
-        let base = EntryEditor.Fields(startSeconds: 9 * 3600, endSeconds: 10 * 3600, durationSeconds: 3600)
-        let f = EntryEditor.withStart(base, seconds: 8 * 3600)
-        XCTAssertEqual(f.startSeconds, 8 * 3600)
+        let base = editor.fields(start: date(h: 9, m: 0), end: date(h: 10, m: 0))
+        let f = editor.withStart(base, seconds: 8 * 3600)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.start), 8 * 3600)
         XCTAssertEqual(f.durationSeconds, 3600)
-        XCTAssertEqual(f.endSeconds, 9 * 3600)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.end ?? f.start), 9 * 3600)
     }
 
     func testWithStartWrapsEndAcrossMidnight() {
-        let base = EntryEditor.Fields(startSeconds: 23 * 3600, endSeconds: 0, durationSeconds: 3600)
-        let f = EntryEditor.withStart(base, seconds: 23 * 3600 + 30 * 60)
-        XCTAssertEqual(f.startSeconds, 23 * 3600 + 30 * 60)
+        let base = editor.fields(start: date(h: 23, m: 0), end: date(d: 2, h: 0, m: 0))
+        let f = editor.withStart(base, seconds: 23 * 3600 + 30 * 60)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.start), 23 * 3600 + 30 * 60)
         XCTAssertEqual(f.durationSeconds, 3600)
-        XCTAssertEqual(f.endSeconds, 30 * 60) // wrapped
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.end ?? f.start), 30 * 60) // wrapped
     }
 
     // MARK: - withEnd
 
     func testWithEndHoldsStartAndRecomputesDuration() {
-        let base = EntryEditor.Fields(startSeconds: 9 * 3600, endSeconds: 10 * 3600, durationSeconds: 3600)
-        let f = EntryEditor.withEnd(base, seconds: 11 * 3600)
-        XCTAssertEqual(f.startSeconds, 9 * 3600)
-        XCTAssertEqual(f.endSeconds, 11 * 3600)
+        let base = editor.fields(start: date(h: 9, m: 0), end: date(h: 10, m: 0))
+        let f = editor.withEnd(base, seconds: 11 * 3600)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.start), 9 * 3600)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.end ?? f.start), 11 * 3600)
         XCTAssertEqual(f.durationSeconds, 2 * 3600)
     }
 
-    func testWithEndBeforeStartAdds24HoursToDuration() {
-        let base = EntryEditor.Fields(startSeconds: 23 * 3600, endSeconds: 23 * 3600, durationSeconds: 0)
-        let f = EntryEditor.withEnd(base, seconds: 1 * 3600)
-        XCTAssertEqual(f.startSeconds, 23 * 3600)
-        XCTAssertEqual(f.endSeconds, 1 * 3600)
-        XCTAssertEqual(f.durationSeconds, 2 * 3600) // 23:00 → 01:00 = 2h after +24h
+    func testWithEndBeforeStartUsesTheNextDay() {
+        let base = editor.fields(start: date(h: 23, m: 0), end: date(h: 23, m: 0))
+        let f = editor.withEnd(base, seconds: 1 * 3600)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.start), 23 * 3600)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.end ?? f.start), 1 * 3600)
+        XCTAssertEqual(f.durationSeconds, 2 * 3600)
+        XCTAssertEqual(f.end, date(d: 2, h: 1, m: 0))
     }
 
     // MARK: - withDuration
 
     func testWithDurationHoldsStartAndShiftsEnd() {
-        let base = EntryEditor.Fields(startSeconds: 9 * 3600, endSeconds: 9 * 3600, durationSeconds: 0)
-        let f = EntryEditor.withDuration(base, seconds: 90 * 60)
-        XCTAssertEqual(f.startSeconds, 9 * 3600)
+        let base = editor.fields(start: date(h: 9, m: 0), end: date(h: 9, m: 0))
+        let f = editor.withDuration(base, seconds: 90 * 60)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.start), 9 * 3600)
         XCTAssertEqual(f.durationSeconds, 90 * 60)
-        XCTAssertEqual(f.endSeconds, 10 * 3600 + 30 * 60)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.end ?? f.start), 10 * 3600 + 30 * 60)
     }
 
     func testWithDurationClampsToOneDay() {
-        let base = EntryEditor.Fields(startSeconds: 0, endSeconds: 0, durationSeconds: 0)
-        let f = EntryEditor.withDuration(base, seconds: 90_000)
-        XCTAssertEqual(f.durationSeconds, EntryEditor.secondsPerDay)
+        let base = editor.fields(start: date(h: 0, m: 0), end: date(h: 0, m: 0))
+        let f = editor.withDuration(base, seconds: 90_000)
+        XCTAssertEqual(f.durationSeconds, 24 * 3600)
     }
 
     func testWithDurationClampsNegativeToZero() {
-        let base = EntryEditor.Fields(startSeconds: 9 * 3600, endSeconds: 10 * 3600, durationSeconds: 3600)
-        let f = EntryEditor.withDuration(base, seconds: -100)
+        let base = editor.fields(start: date(h: 9, m: 0), end: date(h: 10, m: 0))
+        let f = editor.withDuration(base, seconds: -100)
         XCTAssertEqual(f.durationSeconds, 0)
-        XCTAssertEqual(f.endSeconds, 9 * 3600)
+        XCTAssertEqual(editor.days.timeOfDaySeconds(f.end ?? f.start), 9 * 3600)
     }
 
-    // MARK: - resolve
+    // MARK: - dates
 
-    func testResolveProducesDatesOnSameDay() {
-        let baseDate = date(h: 14, m: 0)
-        let f = EntryEditor.Fields(startSeconds: 9 * 3600, endSeconds: 10 * 3600, durationSeconds: 3600)
-        let (start, end) = EntryEditor.resolve(f, baseDate: baseDate, calendar: calendar)
-        XCTAssertEqual(start, date(h: 9, m: 0))
-        XCTAssertEqual(end, date(h: 10, m: 0))
+    func testFieldsRetainDatesOnSameDay() {
+        let f = editor.fields(start: date(h: 9, m: 0), end: date(h: 10, m: 0))
+        XCTAssertEqual(f.start, date(h: 9, m: 0))
+        XCTAssertEqual(f.end, date(h: 10, m: 0))
     }
 
-    func testResolveCrossesMidnightWhenDurationSpansIt() {
-        let baseDate = date(h: 23, m: 0)
-        let f = EntryEditor.Fields(startSeconds: 23 * 3600, endSeconds: 1 * 3600, durationSeconds: 2 * 3600)
-        let (start, end) = EntryEditor.resolve(f, baseDate: baseDate, calendar: calendar)
-        XCTAssertEqual(start, date(d: 1, h: 23, m: 0))
-        XCTAssertEqual(end, date(d: 2, h: 1, m: 0))
+    func testDurationEditCrossesMidnight() {
+        let f = editor.withDuration(editor.fields(start: date(h: 23, m: 0), end: nil), seconds: 2 * 3600)
+        XCTAssertEqual(f.start, date(d: 1, h: 23, m: 0))
+        XCTAssertEqual(f.end, date(d: 2, h: 1, m: 0))
     }
 
     // MARK: - unedited save on daylight-saving days
@@ -129,24 +132,26 @@ final class EntryEditorTests: XCTestCase {
         cal.date(from: DateComponents(year: y, month: mo, day: d, hour: h, minute: m))!
     }
 
-    /// `MainWindowView.saveEdit` on an entry `start`-`end` whose editor holds `fields` and shows `typed` in place of their texts.
+    /// Save applies typed fields even if Enter was not pressed.
     private func save(
-        _ fields: EntryEditor.Fields, typed: [EntryEditor.Field: String] = [:], start: Date, end: Date?, calendar cal: Calendar
+        _ fields: EntryEditor.Fields, typed: [EntryEditor.Field: String] = [:], calendar cal: Calendar
     ) -> (start: Date, end: Date?) {
-        func shown(_ field: EntryEditor.Field) -> String { typed[field] ?? EntryEditor.text(field, of: fields) }
-        let f = EntryEditor.commit(start: shown(.start), end: shown(.end), duration: shown(.duration), to: fields)
-        return EntryEditor.resolve(f, editing: start, end: end, calendar: cal)
+        let editor = makeEditor(calendar: cal)
+        func shown(_ field: EntryEditor.Field) -> String { typed[field] ?? editor.text(field, of: fields) }
+        let f = editor.commit(start: shown(.start), end: shown(.end), duration: shown(.duration), to: fields)
+        return (f.start, f.end)
     }
 
     /// `MainWindowView` opening the editor, pressing Enter in each of `enter`, then saving, with no text changed.
     private func saveUnedited(
         start: Date, end: Date?, enter: [EntryEditor.Field] = [], calendar cal: Calendar
     ) -> (start: Date, end: Date?) {
-        var f = EntryEditor.fields(start: start, end: end, calendar: cal)
+        let editor = makeEditor(calendar: cal)
+        var f = editor.fields(start: start, end: end)
         for field in enter {
-            f = EntryEditor.commit(EntryEditor.text(field, of: f), to: field, of: f)
+            f = editor.commit(editor.text(field, of: f), to: field, of: f)
         }
-        return save(f, start: start, end: end, calendar: cal)
+        return save(f, calendar: cal)
     }
 
     func testUneditedSaveKeepsEntryDatesExactly() {
@@ -205,8 +210,8 @@ final class EntryEditorTests: XCTestCase {
     func testEnteringANewEndKeepsTheStartToTheSecond() {
         let start = date(h: 9, m: 15, s: 42)
         let end = date(h: 10, m: 20, s: 13)
-        let edited = EntryEditor.commit("11:00", to: .end, of: EntryEditor.fields(start: start, end: end, calendar: calendar))
-        let saved = save(edited, start: start, end: end, calendar: calendar)
+        let edited = editor.commit("11:00", to: .end, of: editor.fields(start: start, end: end))
+        let saved = save(edited, calendar: calendar)
         XCTAssertEqual(saved.start, start)
         XCTAssertEqual(saved.end, date(h: 11, m: 0))
     }
@@ -225,11 +230,11 @@ final class EntryEditorTests: XCTestCase {
             ("nothing", [], [:], start, end),
         ]
         for row in rows {
-            var f = EntryEditor.fields(start: start, end: end, calendar: calendar)
+            var f = editor.fields(start: start, end: end)
             for (field, text) in row.entered {
-                f = EntryEditor.commit(text, to: field, of: f)
+                f = editor.commit(text, to: field, of: f)
             }
-            let saved = save(f, typed: row.typed, start: start, end: end, calendar: calendar)
+            let saved = save(f, typed: row.typed, calendar: calendar)
             XCTAssertEqual(saved.start, row.start, row.name)
             XCTAssertEqual(saved.end, row.end, row.name)
         }
@@ -238,16 +243,57 @@ final class EntryEditorTests: XCTestCase {
     func testResolveStartInSkippedHourLandsAtEndOfGap() {
         let cal = gregorian("Europe/Berlin")
         let base = date(cal, y: 2026, mo: 3, d: 29, h: 10, m: 0)
-        let f = EntryEditor.Fields(startSeconds: 2 * 3600 + 30 * 60, endSeconds: 3 * 3600 + 30 * 60, durationSeconds: 3600)
-        let (start, _) = EntryEditor.resolve(f, baseDate: base, calendar: cal)
-        XCTAssertEqual(start, date(y: 2026, mo: 3, d: 29, h: 1, m: 0)) // 03:00 CEST
+        let editor = makeEditor(calendar: cal)
+        let f = editor.withStart(editor.fields(start: base, end: nil), seconds: 2 * 3600 + 30 * 60)
+        XCTAssertEqual(f.start, date(y: 2026, mo: 3, d: 29, h: 1, m: 0)) // 03:00 CEST
+    }
+
+    func testEditingEndAcrossDaylightSavingKeepsTheEnteredWallTime() {
+        let cal = gregorian("Europe/Berlin")
+        for (month, day, elapsedHours) in [(3, 29, 1), (10, 25, 3)] {
+            let start = date(cal, y: 2026, mo: month, d: day, h: 1, m: 30)
+            let originalEnd = date(cal, y: 2026, mo: month, d: day, h: 1, m: 45)
+            let editor = makeEditor(calendar: cal)
+            let fields = editor.fields(start: start, end: originalEnd)
+
+            let saved = save(fields, typed: [.end: "03:30"], calendar: cal)
+
+            XCTAssertEqual(saved.start, start)
+            XCTAssertEqual(saved.end, date(cal, y: 2026, mo: month, d: day, h: 3, m: 30))
+            XCTAssertEqual(saved.end?.timeIntervalSince(start), TimeInterval(elapsedHours * 3600))
+        }
+    }
+
+    func testDurationEditUsesElapsedTimeAcrossDaylightSaving() {
+        let cal = gregorian("Europe/Berlin")
+        let editor = makeEditor(calendar: cal)
+        for (month, day, endHour) in [(3, 29, 4), (10, 25, 2)] {
+            let start = date(cal, y: 2026, mo: month, d: day, h: 1, m: 30)
+            let fields = editor.commit("02:00:00", to: .duration, of: editor.fields(start: start, end: nil))
+
+            XCTAssertEqual(fields.end?.timeIntervalSince(start), 2 * 3600)
+            XCTAssertEqual(editor.text(.end, of: fields), String(format: "%02d:30", endHour))
+            XCTAssertEqual(editor.text(.duration, of: fields), "02:00:00")
+        }
+    }
+
+    func testDurationLimitUsesTheLengthOfTheCalendarDay() {
+        let cal = gregorian("Europe/Berlin")
+        let editor = makeEditor(calendar: cal)
+        for (month, day, hours) in [(3, 29, 23), (10, 25, 25)] {
+            let start = date(cal, y: 2026, mo: month, d: day, h: 0, m: 0) + 0.5
+            let fields = editor.withDuration(editor.fields(start: start, end: nil), seconds: 30 * 3600)
+
+            XCTAssertEqual(fields.durationSeconds, hours * 3600)
+            XCTAssertEqual(fields.end, date(cal, y: 2026, mo: month, d: day + 1, h: 0, m: 0) + 0.5)
+        }
     }
 
     func testResolveStartInRepeatedHourTakesFirstOccurrence() {
         let cal = gregorian("Europe/Berlin")
         let base = date(cal, y: 2026, mo: 10, d: 25, h: 10, m: 0)
-        let f = EntryEditor.Fields(startSeconds: 2 * 3600 + 30 * 60, endSeconds: 3 * 3600 + 30 * 60, durationSeconds: 3600)
-        let (start, _) = EntryEditor.resolve(f, baseDate: base, calendar: cal)
-        XCTAssertEqual(start, date(y: 2026, mo: 10, d: 25, h: 0, m: 30)) // 02:30 CEST
+        let editor = makeEditor(calendar: cal)
+        let f = editor.withStart(editor.fields(start: base, end: nil), seconds: 2 * 3600 + 30 * 60)
+        XCTAssertEqual(f.start, date(y: 2026, mo: 10, d: 25, h: 0, m: 30)) // 02:30 CEST
     }
 }

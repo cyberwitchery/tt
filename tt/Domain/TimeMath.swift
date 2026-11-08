@@ -1,23 +1,13 @@
 import Foundation
 
 enum TimeMath {
-    static func durationSeconds(start: Date, end: Date? = nil, now: Date = Date()) -> Int {
-        let effectiveEnd = end ?? now
-        let seconds = max(0, effectiveEnd.timeIntervalSince(start))
+    static func durationSeconds(start: Date, end: Date) -> Int {
+        let seconds = max(0, end.timeIntervalSince(start))
         return Int(seconds.rounded(.down))
     }
 
-    /// the calendar day `date` falls in, as a half-open range.
-    static func dayRange(for date: Date, calendar: Calendar = .current) -> Range<Date> {
-        guard let day = calendar.dateInterval(of: .day, for: date) else { return date..<date }
-        return day.start..<day.end
-    }
-
-    /// the calendar days from `first` through `last`, in either order, as a half-open range.
-    static func dayRange(from first: Date, through last: Date, calendar: Calendar = .current) -> Range<Date> {
-        let earlier = dayRange(for: min(first, last), calendar: calendar)
-        let later = dayRange(for: max(first, last), calendar: calendar)
-        return earlier.lowerBound..<later.upperBound
+    static func durationSeconds(start: Date, end: Date?, now: Date) -> Int {
+        durationSeconds(start: start, end: end ?? now)
     }
 
     static func formatHMS(seconds: Int) -> String {

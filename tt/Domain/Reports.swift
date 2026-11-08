@@ -41,11 +41,10 @@ enum ReportBuilder {
     /// seconds of `entries` that fall inside the calendar day containing `day`.
     static func dayTotalSeconds(
         entries: [TimeEntry],
-        day: Date,
-        now: Date,
-        calendar: Calendar = .current
+        day: DayCalendar.Day,
+        now: Date
     ) -> Int {
-        let range = TimeMath.dayRange(for: day, calendar: calendar)
+        let range = day.range
         return totalSeconds(
             entries: entries,
             rangeStart: range.lowerBound,
@@ -76,25 +75,20 @@ enum ReportBuilder {
             .sorted { $0.seconds > $1.seconds }
     }
 
-    /// totals for the seven calendar days starting with the one `weekStart` falls in.
+    /// totals clipped to each of the week's calendar days.
     static func weeklyTotals(
         entries: [TimeEntry],
-        weekStart: Date,
-        now: Date,
-        calendar: Calendar
+        week: DayCalendar.Week,
+        now: Date
     ) -> [DayTotal] {
-        var results: [DayTotal] = []
-        var day = TimeMath.dayRange(for: weekStart, calendar: calendar)
-        for _ in 0..<7 {
+        week.days.map { day in
             let seconds = totalSeconds(
                 entries: entries,
-                rangeStart: day.lowerBound,
-                rangeEnd: day.upperBound,
+                rangeStart: day.start,
+                rangeEnd: day.end,
                 now: now
             )
-            results.append(DayTotal(id: day.lowerBound, date: day.lowerBound, seconds: seconds))
-            day = TimeMath.dayRange(for: day.upperBound, calendar: calendar)
+            return DayTotal(id: day.start, date: day.start, seconds: seconds)
         }
-        return results
     }
 }

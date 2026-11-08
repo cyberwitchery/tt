@@ -147,9 +147,11 @@ final class AppStateErrorTests: XCTestCase {
 final class AppStateDayBrowsingTests: XCTestCase {
     private var dbQueue: DatabaseQueue!
     private var entryRepository: TimeEntryRepository!
+    private var clock = TestClock()
 
     override func setUp() {
         super.setUp()
+        clock = TestClock()
         dbQueue = try! TestDatabase.makeInMemory()
         entryRepository = TimeEntryRepository(dbQueue: dbQueue)
     }
@@ -163,7 +165,8 @@ final class AppStateDayBrowsingTests: XCTestCase {
     private func makeTracker() -> TimeTracker {
         TimeTracker(
             projectRepository: ProjectRepository(dbQueue: dbQueue),
-            timeEntryRepository: entryRepository
+            timeEntryRepository: entryRepository,
+            days: clock.days
         )
     }
 
@@ -249,10 +252,12 @@ final class AppStateDayBrowsingTests: XCTestCase {
             )
         )
         try entryRepository.insertRunning(entry: today)
-        tracker.refreshEntries(now: time(daysAgo: 1, hour: 23))
+        clock.now = time(daysAgo: 1, hour: 23)
+        tracker.refreshEntries()
         XCTAssertTrue(appState.visibleEntries.isEmpty)
 
-        appState.tick(now: time(daysAgo: 0, hour: 0, minute: 30))
+        clock.now = time(daysAgo: 0, hour: 0, minute: 30)
+        appState.tick()
 
         XCTAssertEqual(appState.visibleEntries.map(\.id), [today.id])
         XCTAssertEqual(appState.selectedDay, Calendar.current.startOfDay(for: Date()))

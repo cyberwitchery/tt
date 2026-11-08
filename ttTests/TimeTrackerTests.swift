@@ -7,15 +7,18 @@ final class TimeTrackerTests: XCTestCase {
     var projectRepository: ProjectRepository!
     var timeEntryRepository: TimeEntryRepository!
     var tracker: TimeTracker!
+    private var clock = TestClock()
 
     override func setUp() {
         super.setUp()
+        clock = TestClock()
         dbQueue = try! TestDatabase.makeInMemory()
         projectRepository = ProjectRepository(dbQueue: dbQueue)
         timeEntryRepository = TimeEntryRepository(dbQueue: dbQueue)
         tracker = TimeTracker(
             projectRepository: projectRepository,
-            timeEntryRepository: timeEntryRepository
+            timeEntryRepository: timeEntryRepository,
+            days: clock.days
         )
     }
 
@@ -28,6 +31,41 @@ final class TimeTrackerTests: XCTestCase {
     }
 
     // MARK: - Initial Load
+
+    func testInitialLoadUsesTheInjectedDayForEntriesAndReports() throws {
+        clock.calendar = Calendar(identifier: .gregorian)
+        clock.calendar.timeZone = TimeZone(identifier: "Pacific/Kiritimati")!
+        clock.now = Date.from(year: 2026, month: 1, day: 1, hour: 12)
+        let project = Project(name: "test")
+        try projectRepository.insert(project)
+        let entry = TimeEntry(
+            projectId: project.id,
+            start: Date.from(year: 2026, month: 1, day: 1, hour: 10),
+            end: Date.from(year: 2026, month: 1, day: 1, hour: 11)
+        )
+        try timeEntryRepository.insertRunning(entry: entry)
+
+        try tracker.loadInitialState()
+
+        XCTAssertEqual(tracker.selectedDay(), Date.from(year: 2026, month: 1, day: 1, hour: 10))
+        XCTAssertEqual(tracker.todaysEntries.map(\.id), [entry.id])
+        XCTAssertEqual(tracker.dailyTotals.map(\.seconds), [3600])
+        XCTAssertEqual(tracker.weeklyTotals().last?.seconds, 3600)
+    }
+
+    func testTimerUsesTheInjectedClockForStartAndStop() throws {
+        clock.now = Date.from(year: 2026, month: 1, day: 1, hour: 9)
+        try tracker.loadInitialState()
+        try tracker.startTimer()
+        let id = try XCTUnwrap(tracker.runningEntry?.id)
+        XCTAssertEqual(tracker.startedAt, clock.now)
+
+        clock.now = clock.now.addingTimeInterval(90)
+        XCTAssertEqual(tracker.elapsedSeconds(), 90)
+        try tracker.stopTimer()
+
+        XCTAssertEqual(try timeEntryRepository.get(id: id)?.end, clock.now)
+    }
 
     func testLoadInitialStateCreatesDefaultProject() throws {
         try tracker.loadInitialState()
@@ -119,7 +157,8 @@ final class TimeTrackerTests: XCTestCase {
         try tracker.startTimer()
 
         let now = tracker.runningEntry!.start.addingTimeInterval(120)
-        let elapsed = tracker.elapsedSeconds(now: now)
+        clock.now = now
+        let elapsed = tracker.elapsedSeconds()
 
         XCTAssertEqual(elapsed, 120)
     }
@@ -218,7 +257,9 @@ final class TimeTrackerTests: XCTestCase {
         try tracker.archiveProject(id: project.id)
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        tracker.refreshReports(now: start.addingTimeInterval(7200), calendar: calendar)
+        clock.now = start.addingTimeInterval(7200)
+        clock.calendar = calendar
+        tracker.refreshReports()
 
         XCTAssertEqual(tracker.projectName(for: project.id), "client")
         XCTAssertEqual(tracker.dailyTotals.map(\.name), ["client"])
@@ -308,7 +349,9 @@ final class TimeTrackerTests: XCTestCase {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let now = start.addingTimeInterval(42)
-        tracker.refreshReports(now: now, calendar: calendar)
+        clock.now = now
+        clock.calendar = calendar
+        tracker.refreshReports()
 
         XCTAssertEqual(tracker.dailyTotals.count, 1)
         XCTAssertEqual(tracker.dailyTotals[0].seconds, 42)
@@ -328,9 +371,11 @@ final class TimeTrackerTests: XCTestCase {
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let now = Date.from(year: 2024, month: 1, day: 7, hour: 12)
 
-        tracker.refreshReports(now: now, calendar: calendar)
+        clock.now = now
+        clock.calendar = calendar
+        tracker.refreshReports()
 
-        let totalSeconds = tracker.weeklyTotals(now: now, calendar: calendar).reduce(0) { $0 + $1.seconds }
+        let totalSeconds = tracker.weeklyTotals().reduce(0) { $0 + $1.seconds }
         XCTAssertEqual(totalSeconds, 2 * 3600)
     }
 
@@ -345,9 +390,11 @@ final class TimeTrackerTests: XCTestCase {
         try timeEntryRepository.insertRunning(entry: entry)
 
         let now = santiago(8, 12)
-        tracker.refreshReports(now: now, calendar: calendar)
+        clock.now = now
+        clock.calendar = calendar
+        tracker.refreshReports()
 
-        XCTAssertEqual(tracker.weeklyTotals(now: now, calendar: calendar).first?.seconds, 15 * 60)
+        XCTAssertEqual(tracker.weeklyTotals().first?.seconds, 15 * 60)
     }
 
     func testWeeklyTotalsCountARunningTimerUpToEachRead() throws {
@@ -367,10 +414,14 @@ final class TimeTrackerTests: XCTestCase {
         for (start, refreshed, read, days) in timers {
             let entry = TimeEntry(projectId: tracker.projects[0].id, start: start)
             try timeEntryRepository.insertRunning(entry: entry)
-            tracker.refreshReports(now: refreshed, calendar: calendar)
+            clock.now = refreshed
+            clock.calendar = calendar
+            tracker.refreshReports()
 
-            XCTAssertEqual(tracker.weeklyTotals(now: read, calendar: calendar).map(\.seconds), days, "\(start)")
-            let hourLater = tracker.weeklyTotals(now: read.addingTimeInterval(3600), calendar: calendar)
+            clock.now = read
+            XCTAssertEqual(tracker.weeklyTotals().map(\.seconds), days, "\(start)")
+            clock.now = read.addingTimeInterval(3600)
+            let hourLater = tracker.weeklyTotals()
             XCTAssertEqual(hourLater.map(\.seconds).reduce(0, +), days.reduce(0, +) + hour, "\(start)")
 
             try timeEntryRepository.delete(id: entry.id)

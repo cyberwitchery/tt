@@ -177,9 +177,8 @@ final class ReportBuilderTests: XCTestCase {
 
         let totals = ReportBuilder.weeklyTotals(
             entries: [entry],
-            weekStart: weekStart,
-            now: now,
-            calendar: calendar
+            week: DayCalendar(calendar: { calendar }).week(startingOn: weekStart),
+            now: now
         )
 
         XCTAssertEqual(totals.count, 7)
@@ -196,9 +195,8 @@ final class ReportBuilderTests: XCTestCase {
 
         let totals = ReportBuilder.weeklyTotals(
             entries: [],
-            weekStart: weekStart,
-            now: now,
-            calendar: calendar
+            week: DayCalendar(calendar: { calendar }).week(startingOn: weekStart),
+            now: now
         )
 
         XCTAssertEqual(totals.count, 7)
@@ -222,9 +220,8 @@ final class ReportBuilderTests: XCTestCase {
 
         let totals = ReportBuilder.weeklyTotals(
             entries: [entry],
-            weekStart: weekStart,
-            now: now,
-            calendar: calendar
+            week: DayCalendar(calendar: { calendar }).week(startingOn: weekStart),
+            now: now
         )
 
         XCTAssertEqual(totals[0].seconds, 2 * 3600)
@@ -245,9 +242,8 @@ final class ReportBuilderTests: XCTestCase {
 
         let totals = ReportBuilder.weeklyTotals(
             entries: [entry],
-            weekStart: weekStart,
-            now: now,
-            calendar: calendar
+            week: DayCalendar(calendar: { calendar }).week(startingOn: weekStart),
+            now: now
         )
 
         XCTAssertEqual(totals[0].seconds, 2 * 3600)
@@ -276,9 +272,8 @@ final class ReportBuilderTests: XCTestCase {
 
         let totals = ReportBuilder.weeklyTotals(
             entries: entries,
-            weekStart: weekStart,
-            now: now,
-            calendar: calendar
+            week: DayCalendar(calendar: { calendar }).week(startingOn: weekStart),
+            now: now
         )
 
         XCTAssertEqual(totals[0].seconds, 2 * 3600)
@@ -294,9 +289,8 @@ final class ReportBuilderTests: XCTestCase {
 
         let totals = ReportBuilder.weeklyTotals(
             entries: [entry],
-            weekStart: santiago(8, 1),
-            now: santiago(14, 12),
-            calendar: calendar
+            week: DayCalendar(calendar: { calendar }).week(startingOn: santiago(8, 1)),
+            now: santiago(14, 12)
         )
 
         XCTAssertEqual(totals.map(\.seconds), [0, 15 * 60, 0, 0, 0, 0, 0])
@@ -365,14 +359,13 @@ final class ReportBuilderTests: XCTestCase {
         XCTAssertEqual(
             ReportBuilder.dayTotalSeconds(
                 entries: [overnight],
-                day: Date.from(year: 2024, month: 1, day: 1, hour: 8),
-                now: now,
-                calendar: utc
+                day: DayCalendar(calendar: { self.utc }).day(containing: Date.from(year: 2024, month: 1, day: 1, hour: 8)),
+                now: now
             ),
             3600
         )
         XCTAssertEqual(
-            ReportBuilder.dayTotalSeconds(entries: [overnight], day: now, now: now, calendar: utc),
+            ReportBuilder.dayTotalSeconds(entries: [overnight], day: DayCalendar(calendar: { self.utc }).day(containing: now), now: now),
             3600
         )
     }
@@ -385,7 +378,7 @@ final class ReportBuilderTests: XCTestCase {
         let now = Date.from(year: 2024, month: 1, day: 2, hour: 11)
 
         XCTAssertEqual(
-            ReportBuilder.dayTotalSeconds(entries: [running], day: now, now: now, calendar: utc),
+            ReportBuilder.dayTotalSeconds(entries: [running], day: DayCalendar(calendar: { self.utc }).day(containing: now), now: now),
             2 * 3600
         )
     }
