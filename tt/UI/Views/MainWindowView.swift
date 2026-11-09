@@ -10,7 +10,7 @@ struct MainWindowView: View {
     @State private var confirmingStop = false
 
     @State private var editingEntryId: String?
-    @State private var editFields = EntryEditor.Fields(startSeconds: 0, endSeconds: 0, durationSeconds: 0)
+    @State private var editFields = EntryEditor.Fields(start: .distantPast, end: nil)
     @State private var editProjectId: String?
     @State private var editNote = ""
     @State private var editStartText = ""
@@ -23,8 +23,17 @@ struct MainWindowView: View {
     @FocusState private var newProjectFocused: Bool
     @State private var confirmingArchiveId: String?
 
-    @State private var exportStart: Date = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? Date()
-    @State private var exportEnd: Date = Date()
+    @State private var exportStart: Date
+    @State private var exportEnd: Date
+
+    private var editor: EntryEditor { EntryEditor(days: appState.days) }
+
+    init(appState: AppState) {
+        self.appState = appState
+        let now = appState.days.now
+        _exportStart = State(initialValue: appState.days.monthStart(containing: now))
+        _exportEnd = State(initialValue: now)
+    }
 
     // keyboard flow: after user picks a project via the N shortcut, start timer.
     @State private var startAfterProjectPick = false
@@ -81,6 +90,8 @@ struct MainWindowView: View {
         .frame(width: 400, height: 610)
         .background(BrutalistTheme.bg)
         .background(KeyEventCatcher(handler: handleKey))
+        .environment(\.calendar, appState.days.calendar)
+        .environment(\.timeZone, appState.days.calendar.timeZone)
         .onTapGesture {
             if projectPickerOpen { projectPickerOpen = false }
             if editProjectPickerOpen { editProjectPickerOpen = false }
@@ -331,7 +342,7 @@ struct MainWindowView: View {
     }
 
     private func entryRow(_ entry: TimeEntry) -> some View {
-        let duration = TimeMath.durationSeconds(start: entry.start, end: entry.end)
+        let duration = TimeMath.durationSeconds(start: entry.start, end: entry.end, now: appState.days.now)
         let isRunning = appState.runningEntry?.id == entry.id
         return HStack(spacing: 8) {
             Text(entry.end == nil
@@ -473,7 +484,7 @@ struct MainWindowView: View {
         editingEntryId = entry.id
         editProjectId = entry.projectId
         editNote = entry.note ?? ""
-        editFields = EntryEditor.fields(start: entry.start, end: entry.end)
+        editFields = editor.fields(start: entry.start, end: entry.end)
         syncEditTexts()
     }
 
@@ -484,35 +495,34 @@ struct MainWindowView: View {
     }
 
     private func syncEditTexts() {
-        editStartText = EntryEditor.text(.start, of: editFields)
-        editEndText = EntryEditor.text(.end, of: editFields)
-        editDurText = EntryEditor.text(.duration, of: editFields)
+        editStartText = editor.text(.start, of: editFields)
+        editEndText = editor.text(.end, of: editFields)
+        editDurText = editor.text(.duration, of: editFields)
     }
 
     private func commitStart() {
-        editFields = EntryEditor.commit(editStartText, to: .start, of: editFields)
+        editFields = editor.commit(editStartText, to: .start, of: editFields)
         syncEditTexts()
     }
 
     private func commitEnd() {
-        editFields = EntryEditor.commit(editEndText, to: .end, of: editFields)
+        editFields = editor.commit(editEndText, to: .end, of: editFields)
         syncEditTexts()
     }
 
     private func commitDur() {
-        editFields = EntryEditor.commit(editDurText, to: .duration, of: editFields)
+        editFields = editor.commit(editDurText, to: .duration, of: editFields)
         syncEditTexts()
     }
 
     private func saveEdit(_ entry: TimeEntry) {
-        let fields = EntryEditor.commit(start: editStartText, end: editEndText, duration: editDurText, to: editFields)
-        let (start, end) = EntryEditor.resolve(fields, editing: entry.start, end: entry.end)
+        let fields = editor.commit(start: editStartText, end: editEndText, duration: editDurText, to: editFields)
         let isRunning = appState.runningEntry?.id == entry.id
         let newProjectId = editProjectId ?? entry.projectId
         appState.updateEntry(
             id: entry.id,
-            start: start,
-            end: isRunning ? nil : end,
+            start: fields.start,
+            end: isRunning ? nil : fields.end,
             note: editNote,
             projectId: newProjectId
         )
@@ -665,10 +675,9 @@ struct MainWindowView: View {
     private var weekChart: some View {
         let totals = appState.weeklyTotals()
         let maxSeconds = max(1, totals.map(\.seconds).max() ?? 1)
-        let today = Calendar.current.startOfDay(for: Date())
         return HStack(alignment: .bottom, spacing: 6) {
             ForEach(totals) { day in
-                let isToday = Calendar.current.isDate(day.date, inSameDayAs: today)
+                let isToday = appState.days.isToday(day.date)
                 VStack(spacing: 4) {
                     ZStack(alignment: .bottom) {
                         Rectangle()
@@ -746,7 +755,7 @@ struct MainWindowView: View {
     }
 
     private func exportCSV() {
-        let range = TimeMath.dayRange(from: exportStart, through: exportEnd)
+        let range = appState.days.range(from: exportStart, through: exportEnd)
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType.commaSeparatedText]
         panel.nameFieldStringValue = "tt-export.csv"

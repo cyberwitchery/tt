@@ -212,8 +212,7 @@ final class TimeEntryRepositoryTests: XCTestCase {
         try repository.insertRunning(entry: after)
 
         let fetched = try repository.fetchEntries(
-            onDay: Date.from(year: 2024, month: 1, day: 2, hour: 17),
-            calendar: utcCalendar
+            on: DayCalendar(calendar: { self.utcCalendar }).day(containing: Date.from(year: 2024, month: 1, day: 2, hour: 17))
         )
 
         XCTAssertEqual(fetched.map(\.id), [onDay.id])
@@ -228,12 +227,10 @@ final class TimeEntryRepositoryTests: XCTestCase {
         try repository.insertRunning(entry: overnight)
 
         let first = try repository.fetchEntries(
-            onDay: Date.from(year: 2024, month: 1, day: 1, hour: 12),
-            calendar: utcCalendar
+            on: DayCalendar(calendar: { self.utcCalendar }).day(containing: Date.from(year: 2024, month: 1, day: 1, hour: 12))
         )
         let second = try repository.fetchEntries(
-            onDay: Date.from(year: 2024, month: 1, day: 2, hour: 12),
-            calendar: utcCalendar
+            on: DayCalendar(calendar: { self.utcCalendar }).day(containing: Date.from(year: 2024, month: 1, day: 2, hour: 12))
         )
 
         XCTAssertEqual(first.map(\.id), [overnight.id])
@@ -248,8 +245,7 @@ final class TimeEntryRepositoryTests: XCTestCase {
         try repository.insertRunning(entry: running)
 
         let later = try repository.fetchEntries(
-            onDay: Date.from(year: 2024, month: 1, day: 3, hour: 12),
-            calendar: utcCalendar
+            on: DayCalendar(calendar: { self.utcCalendar }).day(containing: Date.from(year: 2024, month: 1, day: 3, hour: 12))
         )
 
         XCTAssertEqual(later.map(\.id), [running.id])
@@ -264,8 +260,7 @@ final class TimeEntryRepositoryTests: XCTestCase {
         try repository.insertRunning(entry: entry)
 
         let fetched = try repository.fetchEntries(
-            onDay: Date.from(year: 2024, month: 1, day: 2, hour: 12),
-            calendar: utcCalendar
+            on: DayCalendar(calendar: { self.utcCalendar }).day(containing: Date.from(year: 2024, month: 1, day: 2, hour: 12))
         )
 
         XCTAssertTrue(fetched.isEmpty)

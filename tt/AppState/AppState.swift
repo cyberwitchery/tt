@@ -7,6 +7,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     static let shared = AppState()
 
     private let tracker: TimeTracker
+    var days: DayCalendar { tracker.days }
     private var timer: Timer?
     private var idleTimer: Timer?
 
@@ -14,7 +15,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     @Published private(set) var runningEntry: TimeEntry?
     @Published private(set) var todaysEntries: [TimeEntry] = []
     @Published private(set) var visibleEntries: [TimeEntry] = []
-    @Published private(set) var selectedDay: Date = Calendar.current.startOfDay(for: Date())
+    @Published private(set) var selectedDay: Date
     @Published private(set) var isViewingToday: Bool = true
     @Published private(set) var dailyTotals: [ProjectTotal] = []
     @Published private(set) var projectCompletedTotals: [String: Int] = [:]
@@ -45,6 +46,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
             projectRepository: projectRepository,
             timeEntryRepository: timeEntryRepository
         )
+        selectedDay = tracker.selectedDay()
         tracker.delegate = self
 
         Task {
@@ -58,6 +60,7 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     // for testing only
     init(tracker: TimeTracker) {
         self.tracker = tracker
+        selectedDay = tracker.selectedDay()
         tracker.delegate = self
     }
 
@@ -86,16 +89,16 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         idleSeconds = tracker.idleSeconds()
     }
 
-    func visibleDayTotalSeconds(now: Date = Date()) -> Int {
-        tracker.visibleDayTotalSeconds(now: now)
+    func visibleDayTotalSeconds() -> Int {
+        tracker.visibleDayTotalSeconds()
     }
 
-    func todayTotalSeconds(now: Date = Date()) -> Int {
-        tracker.todayTotalSeconds(now: now)
+    func todayTotalSeconds() -> Int {
+        tracker.todayTotalSeconds()
     }
 
-    func weeklyTotals(now: Date = Date()) -> [DayTotal] {
-        tracker.weeklyTotals(now: now)
+    func weeklyTotals() -> [DayTotal] {
+        tracker.weeklyTotals()
     }
 
     func projectAllTimeSeconds(for projectId: String) -> Int {
@@ -194,8 +197,8 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
     }
 
     /// the 60s timer body: idle time, plus a reload once the day has rolled over.
-    func tick(now: Date = Date()) {
-        guard tracker.rollOverIfNeeded(now: now) else {
+    func tick() {
+        guard tracker.rollOverIfNeeded() else {
             updateIdle()
             return
         }
@@ -250,14 +253,14 @@ final class AppState: ObservableObject, TimeTrackerDelegate {
         tracker.projectName(for: projectId)
     }
 
-    func refreshReports(now: Date = Date(), calendar: Calendar = .current) {
-        tracker.refreshReports(now: now, calendar: calendar)
+    func refreshReports() {
+        tracker.refreshReports()
         syncFromTracker()
     }
 
-    func exportCSV(range: Range<Date>, to url: URL, now: Date = Date()) {
+    func exportCSV(range: Range<Date>, to url: URL) {
         do {
-            try tracker.exportCSV(range: range, to: url, now: now)
+            try tracker.exportCSV(range: range, to: url)
         } catch {
             surfaceError(error)
         }

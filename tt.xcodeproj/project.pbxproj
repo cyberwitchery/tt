@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C10000000000000000000001 /* DayCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000002 /* DayCalendar.swift */; };
 		A10000000000000000000001 /* ttApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* ttApp.swift */; };
 		A10000000000000000000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* AppDelegate.swift */; };
 		A10000000000000000000003 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* AppState.swift */; };
@@ -75,6 +76,7 @@
 /* End PBXTargetDependency section */
 
 /* Begin PBXFileReference section */
+		C10000000000000000000002 /* DayCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayCalendar.swift; sourceTree = "<group>"; };
 		A10000000000000000000010 /* tt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = tt.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000011 /* ttApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ttApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000012 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -234,6 +236,7 @@
 			children = (
 				A10000000000000000000014 /* Models.swift */,
 				A10000000000000000000015 /* TimeMath.swift */,
+				C10000000000000000000002 /* DayCalendar.swift */,
 				A10000000000000000000044 /* Reports.swift */,
 				A10000000000000000000046 /* CSVExporter.swift */,
 				A1000000000000000000005A /* TimeTracker.swift */,
@@ -414,6 +417,7 @@
 				A10000000000000000000003 /* AppState.swift in Sources */,
 				A10000000000000000000004 /* Models.swift in Sources */,
 				A10000000000000000000005 /* TimeMath.swift in Sources */,
+				C10000000000000000000001 /* DayCalendar.swift in Sources */,
 				A10000000000000000000043 /* Reports.swift in Sources */,
 				A10000000000000000000045 /* CSVExporter.swift in Sources */,
 				A10000000000000000000006 /* DatabaseManager.swift in Sources */,

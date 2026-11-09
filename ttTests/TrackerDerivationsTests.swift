@@ -7,15 +7,18 @@ final class TrackerDerivationsTests: XCTestCase {
     var projectRepository: ProjectRepository!
     var timeEntryRepository: TimeEntryRepository!
     var tracker: TimeTracker!
+    private var clock = TestClock()
 
     override func setUp() {
         super.setUp()
+        clock = TestClock()
         dbQueue = try! TestDatabase.makeInMemory()
         projectRepository = ProjectRepository(dbQueue: dbQueue)
         timeEntryRepository = TimeEntryRepository(dbQueue: dbQueue)
         tracker = TimeTracker(
             projectRepository: projectRepository,
-            timeEntryRepository: timeEntryRepository
+            timeEntryRepository: timeEntryRepository,
+            days: clock.days
         )
     }
 
@@ -76,7 +79,8 @@ final class TrackerDerivationsTests: XCTestCase {
         try tracker.loadInitialState()
 
         let now = end.addingTimeInterval(125) // 2m 5s later
-        XCTAssertEqual(tracker.idleSeconds(now: now), 125)
+        clock.now = now
+        XCTAssertEqual(tracker.idleSeconds(), 125)
     }
 
     func testIdleSecondsClampsToZeroWhenNowBeforeLastEnd() throws {
@@ -96,7 +100,8 @@ final class TrackerDerivationsTests: XCTestCase {
 
         // clock skew: now earlier than last end.
         let now = end.addingTimeInterval(-60)
-        XCTAssertEqual(tracker.idleSeconds(now: now), 0)
+        clock.now = now
+        XCTAssertEqual(tracker.idleSeconds(), 0)
     }
 
     // MARK: - projectCompletedTotals
@@ -151,7 +156,8 @@ final class TrackerDerivationsTests: XCTestCase {
         try tracker.loadInitialState()
 
         let now = runStart.addingTimeInterval(1800)
-        XCTAssertEqual(tracker.projectAllTimeSeconds(for: a.id, now: now), 3600 + 1800)
+        clock.now = now
+        XCTAssertEqual(tracker.projectAllTimeSeconds(for: a.id), 3600 + 1800)
     }
 
     func testProjectAllTimeSecondsForOtherProjectIgnoresRunning() throws {
@@ -169,7 +175,8 @@ final class TrackerDerivationsTests: XCTestCase {
 
         let now = Date.from(year: 2025, month: 1, day: 1, hour: 11, minute: 30)
         // `a` has only the 1h ended entry; running is on `b`, so `a`'s total stays 3600.
-        XCTAssertEqual(tracker.projectAllTimeSeconds(for: a.id, now: now), 3600)
+        clock.now = now
+        XCTAssertEqual(tracker.projectAllTimeSeconds(for: a.id), 3600)
     }
 
     // MARK: - updateEntry projectId reassignment
@@ -384,12 +391,12 @@ final class TrackerDerivationsTests: XCTestCase {
         tracker.refreshEntries()
         tracker.stepDay(by: -1)
 
-        let fields = EntryEditor.withEnd(
-            EntryEditor.fields(start: entry.start, end: entry.end),
+        let editor = EntryEditor(days: clock.days)
+        let fields = editor.withEnd(
+            editor.fields(start: entry.start, end: entry.end),
             seconds: 11 * 3600
         )
-        let (start, end) = EntryEditor.resolve(fields, baseDate: entry.start)
-        try tracker.updateEntry(id: entry.id, start: start, end: end, note: "fixed")
+        try tracker.updateEntry(id: entry.id, start: fields.start, end: fields.end, note: "fixed")
 
         XCTAssertFalse(tracker.isViewingToday)
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id])
@@ -462,10 +469,12 @@ final class TrackerDerivationsTests: XCTestCase {
     func testRollOverMovesTheListOntoTheNewDay() throws {
         try tracker.loadInitialState()
         try insert(daysAgo: 1, from: 9, to: 10)
-        tracker.refreshEntries(now: time(daysAgo: 1, hour: 23))
+        clock.now = time(daysAgo: 1, hour: 23)
+        tracker.refreshEntries()
         XCTAssertEqual(tracker.visibleEntries.count, 1)
 
-        XCTAssertTrue(tracker.rollOverIfNeeded(now: time(daysAgo: 0, hour: 0, minute: 30)))
+        clock.now = time(daysAgo: 0, hour: 0, minute: 30)
+        XCTAssertTrue(tracker.rollOverIfNeeded())
 
         XCTAssertTrue(tracker.isViewingToday)
         XCTAssertEqual(tracker.selectedDay(), startOfDay(daysAgo: 0))
@@ -477,10 +486,12 @@ final class TrackerDerivationsTests: XCTestCase {
         try tracker.loadInitialState()
         let older = try insert(daysAgo: 2, from: 9, to: 10)
         tracker.stepDay(by: -1)
-        tracker.refreshEntries(now: time(daysAgo: 1, hour: 23))
+        clock.now = time(daysAgo: 1, hour: 23)
+        tracker.refreshEntries()
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [older.id])
 
-        XCTAssertTrue(tracker.rollOverIfNeeded(now: time(daysAgo: 0, hour: 0, minute: 30)))
+        clock.now = time(daysAgo: 0, hour: 0, minute: 30)
+        XCTAssertTrue(tracker.rollOverIfNeeded())
 
         XCTAssertEqual(tracker.dayOffset, -2)
         XCTAssertEqual(tracker.selectedDay(), startOfDay(daysAgo: 2))
@@ -497,14 +508,17 @@ final class TrackerDerivationsTests: XCTestCase {
         let older = TimeEntry(projectId: tracker.projects[0].id, start: santiago(7, 9), end: santiago(7, 10))
         try timeEntryRepository.insertRunning(entry: older)
         tracker.stepDay(by: -1)
-        tracker.refreshEntries(now: santiago(8, 23), calendar: calendar)
+        clock.now = santiago(8, 23)
+        clock.calendar = calendar
+        tracker.refreshEntries()
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [older.id])
 
         let now = santiago(9, 0, 30)
-        XCTAssertTrue(tracker.rollOverIfNeeded(now: now, calendar: calendar))
+        clock.now = now
+        XCTAssertTrue(tracker.rollOverIfNeeded())
 
         XCTAssertEqual(tracker.dayOffset, -2)
-        XCTAssertEqual(tracker.selectedDay(now: now, calendar: calendar), santiago(7, 0))
+        XCTAssertEqual(tracker.selectedDay(), santiago(7, 0))
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [older.id])
     }
 
@@ -525,22 +539,29 @@ final class TrackerDerivationsTests: XCTestCase {
         for (loaded, zone, system, month, day, hour) in rollOvers {
             try tracker.loadInitialState()
             tracker.stepDay(by: -1)
-            tracker.refreshEntries(now: date(10, 31, 10, in: "Europe/Berlin"), calendar: calendar("Europe/Berlin", loaded))
+            clock.now = date(10, 31, 10, in: "Europe/Berlin")
+            clock.calendar = calendar("Europe/Berlin", loaded)
+            tracker.refreshEntries()
 
             let moved = calendar(zone, system)
             let now = date(month, day, hour, in: zone)
-            XCTAssertTrue(tracker.rollOverIfNeeded(now: now, calendar: moved), zone)
+            clock.now = now
+            clock.calendar = moved
+            XCTAssertTrue(tracker.rollOverIfNeeded(), zone)
 
-            XCTAssertEqual(tracker.selectedDay(now: now, calendar: moved), date(10, 30, 0, in: zone), zone)
+            XCTAssertEqual(tracker.selectedDay(), date(10, 30, 0, in: zone), zone)
         }
     }
 
     func testRollOverDoesNothingUntilTheDayActuallyChanges() throws {
-        XCTAssertFalse(tracker.rollOverIfNeeded(now: time(daysAgo: 0, hour: 9)))
+        clock.now = time(daysAgo: 0, hour: 9)
+        XCTAssertFalse(tracker.rollOverIfNeeded())
 
         try tracker.loadInitialState()
-        tracker.refreshEntries(now: time(daysAgo: 0, hour: 9))
+        clock.now = time(daysAgo: 0, hour: 9)
+        tracker.refreshEntries()
 
-        XCTAssertFalse(tracker.rollOverIfNeeded(now: time(daysAgo: 0, hour: 23)))
+        clock.now = time(daysAgo: 0, hour: 23)
+        XCTAssertFalse(tracker.rollOverIfNeeded())
     }
 }

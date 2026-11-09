@@ -65,14 +65,61 @@ final class TimeMathTests: XCTestCase {
         XCTAssertEqual(TimeMath.formatHMS(seconds: -1), "00:00:00")
         XCTAssertEqual(TimeMath.formatHMS(seconds: -3600), "00:00:00")
     }
+}
 
-    // MARK: - dayRange
+final class DayCalendarTests: XCTestCase {
+    func testTodayAndMonthStartUseTheInjectedClock() {
+        let clock = TestClock()
+        clock.calendar = Calendar(identifier: .gregorian)
+        clock.calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        clock.now = Date.from(year: 2026, month: 3, day: 31, hour: 23)
+        let days = clock.days
+
+        XCTAssertEqual(days.today.start, Date.from(year: 2026, month: 3, day: 31))
+        XCTAssertEqual(days.monthStart(containing: days.now), Date.from(year: 2026, month: 3, day: 1))
+        XCTAssertTrue(days.isToday(clock.now))
+        XCTAssertFalse(days.isToday(Date.from(year: 2026, month: 4, day: 1)))
+
+        clock.now = Date.from(year: 2026, month: 4, day: 1)
+        XCTAssertEqual(days.today.start, clock.now)
+        XCTAssertEqual(days.monthStart(containing: days.now), clock.now)
+    }
+
+    func testRollingWeekUsesWholeDaysAcrossClockChanges() {
+        for (zone, month, day, hours) in [("Europe/Berlin", 3, 29, 23), ("Europe/Berlin", 10, 25, 25), ("America/Santiago", 9, 6, 23)] {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = TimeZone(identifier: zone)!
+            let date = calendar.date(from: DateComponents(year: 2026, month: month, day: day, hour: 12))!
+            let days = DayCalendar(calendar: { calendar })
+
+            let week = days.week(endingOn: date)
+
+            XCTAssertEqual(week.days.count, 7, zone)
+            XCTAssertEqual(week.days.last?.range, days.day(containing: date).range, zone)
+            XCTAssertEqual(week.range.upperBound.timeIntervalSince(week.range.lowerBound), TimeInterval((6 * 24 + hours) * 3600), zone)
+            for (previous, next) in zip(week.days, week.days.dropFirst()) {
+                XCTAssertEqual(previous.end, next.start, zone)
+            }
+        }
+    }
+
+    func testDaysBetweenCountsCivilDatesAcrossMissingMidnight() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Santiago")!
+        let days = DayCalendar(calendar: { calendar })
+        let before = days.day(containing: calendar.date(from: DateComponents(year: 2024, month: 9, day: 8, hour: 23))!)
+        let after = days.nextDay(after: before)
+
+        XCTAssertEqual(days.daysBetween(before, and: after), 1)
+        XCTAssertEqual(days.daysBetween(after, and: before), -1)
+        XCTAssertEqual(days.day(byAdding: -1, to: after), before)
+    }
 
     func testDayRangeCoversTheWholeCalendarDay() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
 
-        let range = TimeMath.dayRange(for: Date.from(year: 2024, month: 1, day: 2, hour: 17), calendar: calendar)
+        let range = DayCalendar(calendar: { calendar }).day(containing: Date.from(year: 2024, month: 1, day: 2, hour: 17)).range
 
         XCTAssertEqual(range.lowerBound, Date.from(year: 2024, month: 1, day: 2))
         XCTAssertEqual(range.upperBound, Date.from(year: 2024, month: 1, day: 3))
@@ -82,7 +129,7 @@ final class TimeMathTests: XCTestCase {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Europe/Berlin")!
 
-        let range = TimeMath.dayRange(for: Date.from(year: 2024, month: 10, day: 27, hour: 12), calendar: calendar)
+        let range = DayCalendar(calendar: { calendar }).day(containing: Date.from(year: 2024, month: 10, day: 27, hour: 12)).range
 
         XCTAssertEqual(range.upperBound.timeIntervalSince(range.lowerBound), 25 * 3600)
     }
@@ -103,7 +150,7 @@ final class TimeMathTests: XCTestCase {
         ]
 
         for row in rows {
-            let range = TimeMath.dayRange(from: row.first, through: row.last, calendar: calendar)
+            let range = DayCalendar(calendar: { calendar }).range(from: row.first, through: row.last)
             XCTAssertEqual(range.lowerBound, row.lower, row.name)
             XCTAssertEqual(range.upperBound, row.upper, row.name)
         }
@@ -122,7 +169,7 @@ final class TimeMathTests: XCTestCase {
                 calendar.date(from: DateComponents(year: row.year, month: row.month, day: day, hour: hour))!
             }
 
-            let range = TimeMath.dayRange(for: at(row.day, 12), calendar: calendar)
+            let range = DayCalendar(calendar: { calendar }).day(containing: at(row.day, 12)).range
 
             XCTAssertEqual(range.lowerBound, at(row.day, 1), row.zone)
             XCTAssertEqual(range.upperBound, at(row.day + 1, 0), row.zone)

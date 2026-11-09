@@ -61,8 +61,8 @@ final class TimeEntryRepository {
         }
     }
 
-    func fetchEntries(onDay day: Date, calendar: Calendar = .current) throws -> [TimeEntry] {
-        try fetchEntries(in: TimeMath.dayRange(for: day, calendar: calendar))
+    func fetchEntries(on day: DayCalendar.Day) throws -> [TimeEntry] {
+        try fetchEntries(in: day.range)
     }
 
     func fetchAll() throws -> [TimeEntry] {
