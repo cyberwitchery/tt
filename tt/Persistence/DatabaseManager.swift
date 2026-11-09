@@ -2,24 +2,27 @@ import Foundation
 import GRDB
 
 final class DatabaseManager {
-    static let shared: Result<DatabaseManager, Error> = Result { try DatabaseManager() }
+    static let shared: Result<DatabaseManager, Error> = Result {
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return try DatabaseManager(path: databaseURL(in: support).path)
+    }
 
     let dbQueue: DatabaseQueue
 
-    private init() throws {
-        let fileManager = FileManager.default
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let folderURL = appSupport.appendingPathComponent("tt", isDirectory: true)
-
-        try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true)
-
-        let dbURL = folderURL.appendingPathComponent("tt.sqlite")
-        dbQueue = try DatabaseQueue(path: dbURL.path)
-
-        try migrator.migrate(dbQueue)
+    /// Omitting a path creates an isolated, migrated in-memory database.
+    init(path: String = ":memory:") throws {
+        dbQueue = try DatabaseQueue(path: path)
+        try Self.migrator.migrate(dbQueue)
     }
 
-    private var migrator: DatabaseMigrator {
+    static func databaseURL(in appSupport: URL) throws -> URL {
+        let fileManager = FileManager.default
+        let folder = appSupport.appendingPathComponent("tt", isDirectory: true)
+        try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder.appendingPathComponent("tt.sqlite")
+    }
+
+    private static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
 
         migrator.registerMigration("createProjects") { db in

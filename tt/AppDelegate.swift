@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var eventMonitor: Any?
     private var localEventMonitor: Any?
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard NSClassFromString("XCTestCase") == nil else { return }
         let appState = AppState.shared
 
         panel = makePanel(rootView: StatusPopoverView(appState: appState))

@@ -3,22 +3,34 @@ import Combine
 import GRDB
 @testable import tt
 
-// AppState is a thin UI wrapper around TimeTracker.
-// core business logic is tested in TimeTrackerTests; these tests verify the
-// wrapper properly delegates to TimeTracker.
-
 final class AppStateTests: XCTestCase {
-    func testSelectProjectUpdatesState() async {
-        let appState = await AppState.shared
-        await appState.selectProject(id: "test-id")
-        let selected = await appState.selectedProjectId
-        XCTAssertEqual(selected, "test-id")
+    @MainActor
+    func testBootstrapLoadsAnIsolatedMigratedDatabase() throws {
+        let state = AppState(database: .success(try DatabaseManager()))
+        XCTAssertEqual(state.projects.map(\.name), ["default"])
+        XCTAssertNil(state.lastError)
+        state.startTimer()
+        XCTAssertNotNil(state.runningEntry)
+        state.stopTimer()
+        XCTAssertNil(state.runningEntry)
     }
 
-    func testProjectNameDelegatesToTracker() async {
-        let appState = await AppState.shared
-        let name = await appState.projectName(for: "nonexistent-id")
-        XCTAssertEqual(name, "unknown")
+    @MainActor
+    func testBootstrapSurfacesTheDatabaseOpenFailure() {
+        let error = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "database unavailable"])
+        let state = AppState(database: .failure(error))
+        XCTAssertNotNil(state.lastError)
+        XCTAssertTrue(state.projects.isEmpty)
+    }
+
+    @MainActor
+    func testSelectProjectUpdatesState() throws {
+        let db = try TestDatabase.makeInMemory()
+        let tracker = TimeTracker(projectRepository: ProjectRepository(dbQueue: db), timeEntryRepository: TimeEntryRepository(dbQueue: db))
+        let appState = AppState(tracker: tracker)
+        appState.selectProject(id: "test-id")
+        XCTAssertEqual(appState.selectedProjectId, "test-id")
+        XCTAssertEqual(appState.projectName(for: "missing"), "unknown")
     }
 }
 

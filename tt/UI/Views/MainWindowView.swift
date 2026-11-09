@@ -92,64 +92,50 @@ struct MainWindowView: View {
 
     // MARK: - Keyboard
 
-    private enum KeyCode {
-        static let space: UInt16 = 49
-        static let n: UInt16     = 45
-        static let p: UInt16     = 35
-        static let e: UInt16     = 14
-        static let t: UInt16     = 17
-        static let escape: UInt16 = 53
-        static let leftArrow: UInt16  = 123
-        static let rightArrow: UInt16 = 124
-    }
-
     private func handleKey(_ event: NSEvent) -> NSEvent? {
         let isTextFocused = event.window?.firstResponder is NSText
 
-        // esc is the only key we handle while a text field is focused.
-        if isTextFocused && event.keyCode != KeyCode.escape { return event }
+        guard let shortcut = KeyboardShortcut(keyCode: event.keyCode, textFocused: isTextFocused) else { return event }
 
-        switch event.keyCode {
-        case KeyCode.space:
+        switch shortcut {
+        case .space:
             if appState.runningEntry == nil {
                 appState.startTimer()
             } else {
                 confirmingStop = true
             }
             return nil
-        case KeyCode.n: // new entry: open picker; start timer on next selection
+        case .n: // new entry: open picker; start timer on next selection
             if appState.runningEntry == nil {
                 startAfterProjectPick = true
                 projectPickerOpen = true
             }
             return nil
-        case KeyCode.p: // open project picker
+        case .p: // open project picker
             projectPickerOpen = true
             return nil
-        case KeyCode.e: // edit currently running entry
+        case .e: // edit currently running entry
             if let running = appState.runningEntry {
                 editSession.begin(running)
             }
             return nil
-        case KeyCode.leftArrow: // browse to the previous day
+        case .leftArrow: // browse to the previous day
             showDay(step: -1)
             return nil
-        case KeyCode.rightArrow: // browse to the next day, never past today
+        case .rightArrow: // browse to the next day, never past today
             showDay(step: 1)
             return nil
-        case KeyCode.t: // back to today
+        case .t: // back to today
             editSession.clear()
             appState.showToday()
             return nil
-        case KeyCode.escape: // close open editor/picker/confirm, in priority order
+        case .escape: // close open editor/picker/confirm, in priority order
             if editSession.entryId != nil { editSession.clear(); return nil }
             if editSession.projectPickerOpen { editSession.projectPickerOpen = false; return nil }
             if projectPickerOpen { startAfterProjectPick = false; projectPickerOpen = false; return nil }
             if confirmingStop { confirmingStop = false; return nil }
             if confirmingArchiveId != nil { confirmingArchiveId = nil; return nil }
             if addingProject { cancelAddProject(); return nil }
-            return event
-        default:
             return event
         }
     }
@@ -622,11 +608,10 @@ struct MainWindowView: View {
     }
 
     private var weekChart: some View {
-        let totals = appState.weeklyTotals()
-        let maxSeconds = max(1, totals.map(\.seconds).max() ?? 1)
+        let model = WeekChartModel(totals: appState.weeklyTotals(), days: appState.days)
         return HStack(alignment: .bottom, spacing: 6) {
-            ForEach(totals) { day in
-                let isToday = appState.days.isToday(day.date)
+            ForEach(model.bars) { day in
+                let isToday = day.isToday
                 VStack(spacing: 4) {
                     ZStack(alignment: .bottom) {
                         Rectangle()
@@ -634,12 +619,12 @@ struct MainWindowView: View {
                             .frame(height: 36)
                         Rectangle()
                             .fill(isToday ? BrutalistTheme.accent : BrutalistTheme.fg)
-                            .frame(height: barHeight(seconds: day.seconds, maxSeconds: maxSeconds))
+                            .frame(height: CGFloat(day.height))
                     }
-                    Text(Self.dayFormatter.string(from: day.date).lowercased())
+                    Text(Self.dayFormatter.string(from: day.id).lowercased())
                         .font(BrutalistTheme.metaFont)
                         .foregroundColor(isToday ? BrutalistTheme.fg : BrutalistTheme.dim)
-                    Text(formatBarLabel(day.seconds))
+                    Text(day.label)
                         .font(BrutalistTheme.metaFont)
                         .foregroundColor(isToday ? BrutalistTheme.fg : BrutalistTheme.dim)
                         .monospacedDigit()
@@ -647,20 +632,6 @@ struct MainWindowView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-    }
-
-    private func barHeight(seconds: Int, maxSeconds: Int) -> CGFloat {
-        guard seconds > 0 else { return 0 }
-        let ratio = min(1.0, Double(seconds) / Double(maxSeconds))
-        return max(2, CGFloat(ratio) * 36)
-    }
-
-    private func formatBarLabel(_ seconds: Int) -> String {
-        if seconds <= 0 { return "—" }
-        let h = seconds / 3600
-        let m = (seconds % 3600) / 60
-        if h > 0 { return "\(h)h" }
-        return "\(m)m"
     }
 
     // MARK: - Export
