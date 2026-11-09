@@ -357,7 +357,7 @@ struct MainWindowView: View {
                     editSession.clear()
                 }
                 BrutalistTextButton(title: "save") {
-                    saveEdit()
+                    saveEdit(entry)
                 }
             }
         }
@@ -404,8 +404,8 @@ struct MainWindowView: View {
         )
     }
 
-    private func saveEdit() {
-        guard let update = editSession.update(runningEntryId: appState.runningEntry?.id) else { return }
+    private func saveEdit(_ entry: TimeEntry) {
+        guard let update = editSession.update(runningEntryId: appState.runningEntry?.id, currentEnd: entry.end) else { return }
         appState.updateEntry(id: update.id, start: update.start, end: update.end, note: update.note, projectId: update.projectId)
         editSession.clear()
     }

@@ -3,6 +3,64 @@ import GRDB
 @testable import tt
 
 final class TrackerDerivationsTests: TrackerTestCase {
+    func testFailedMidnightRefreshDoesNotApplyTheDayShiftAgainOnRetry() throws {
+        clock.calendar = Calendar(identifier: .gregorian)
+        clock.calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        clock.now = Date.from(year: 2026, month: 1, day: 2, hour: 23)
+        try tracker.loadInitialState()
+        let start = Date.from(year: 2026, month: 1, day: 1, hour: 9)
+        let entry = TimeEntry(projectId: tracker.projects[0].id, start: start, end: start + 3600)
+        try timeEntryRepository.insertRunning(entry: entry)
+        try tracker.stepDay(by: -1)
+        let selected = tracker.selectedDay()
+        try dbQueue.write { try $0.execute(sql: "ALTER TABLE time_entries RENAME TO unavailable_entries") }
+        clock.now = Date.from(year: 2026, month: 1, day: 3, hour: 0, minute: 30)
+
+        for _ in 0..<2 {
+            XCTAssertThrowsError(try tracker.rollOverIfNeeded())
+            XCTAssertEqual(tracker.dayOffset, -1)
+            XCTAssertEqual(tracker.selectedDay(), selected)
+            XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id])
+            XCTAssertEqual(tracker.visibleDayTotalSeconds(), 3600)
+        }
+
+        try dbQueue.write { try $0.execute(sql: "ALTER TABLE unavailable_entries RENAME TO time_entries") }
+        XCTAssertTrue(try tracker.rollOverIfNeeded())
+        XCTAssertEqual(tracker.dayOffset, -2)
+        XCTAssertEqual(tracker.selectedDay(), selected)
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id])
+        XCTAssertFalse(try tracker.rollOverIfNeeded())
+    }
+
+    func testFailedReportsDoNotPublishTheNavigationTargetEntries() throws {
+        clock.calendar = Calendar(identifier: .gregorian)
+        clock.calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        clock.now = Date.from(year: 2026, month: 1, day: 2, hour: 12)
+        try tracker.loadInitialState()
+        let today = TimeEntry(projectId: tracker.projects[0].id, start: clock.now - 3600, end: clock.now)
+        let yesterday = TimeEntry(projectId: tracker.projects[0].id, start: clock.now - 86400, end: clock.now - 86400 + 1800)
+        for entry in [today, yesterday] { try timeEntryRepository.insertRunning(entry: entry) }
+        try tracker.refreshEntries()
+        try tracker.refreshReports()
+        let selected = tracker.selectedDay()
+        let totals = tracker.projectTotalsForSelectedDay
+        let recent = tracker.recentDayTotals()
+        let failReports = DatabaseFunction("strftime", argumentCount: 2) { _ -> String? in
+            throw DatabaseError(resultCode: .SQLITE_ERROR, message: "injected report failure")
+        }
+        try dbQueue.write { $0.add(function: failReports) }
+
+        XCTAssertThrowsError(try tracker.stepDay(by: -1))
+        XCTAssertTrue(tracker.isViewingToday)
+        XCTAssertEqual(tracker.dayOffset, 0)
+        XCTAssertEqual(tracker.selectedDay(), selected)
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [today.id])
+        XCTAssertEqual(tracker.todaysEntries.map(\.id), [today.id])
+        XCTAssertEqual(tracker.visibleDayTotalSeconds(), 3600)
+        XCTAssertEqual(tracker.projectTotalsForSelectedDay, totals)
+        XCTAssertEqual(tracker.recentDayTotals(), recent)
+    }
+
     // MARK: - startedAt
 
     func testStartedAtIsNilWithNoRunningEntry() throws {
