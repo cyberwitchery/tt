@@ -65,14 +65,6 @@ final class TimeEntryRepository {
         try fetchEntries(in: day.range)
     }
 
-    func fetchAll() throws -> [TimeEntry] {
-        try dbQueue.read { db in
-            try TimeEntry
-                .order(Column("start").desc)
-                .fetchAll(db)
-        }
-    }
-
     func fetchCompletedTotalsByProject() throws -> [String: Int] {
         try dbQueue.read { db in
             let rows = try Row.fetchAll(db, sql: """

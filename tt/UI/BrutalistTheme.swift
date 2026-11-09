@@ -16,7 +16,6 @@ enum BrutalistTheme {
     static let dim        = Color(hex: 0x666666)
     static let dim2       = Color(hex: 0x888888)
     static let rule       = Color(hex: 0x1d1d1d)
-    static let chrome     = Color(hex: 0x1a1a1a)
     static let surface    = Color(hex: 0x141414)
     static let border     = Color(hex: 0x262626)
     static let leader     = Color(hex: 0x2a2a2a)
@@ -34,18 +33,14 @@ enum BrutalistTheme {
     static let timerMainFont    = Font.custom(fontMedium,   size: 36)
     static let timerPopoverFont = Font.custom(fontMedium,   size: 26)
     static let sectionHeaderFont = Font.custom(fontSemibold, size: 10)
-    static let headingFont      = Font.custom(fontSemibold, size: 10)
     static let titleFont        = Font.custom(fontSemibold, size: 13)
     static let bodyFont         = Font.custom(fontRegular,  size: 12)
     static let labelFont        = Font.custom(fontRegular,  size: 10)
     static let buttonFont       = Font.custom(fontRegular,  size: 11)
     static let metaFont         = Font.custom(fontRegular,  size: 10)
-    static let captionFont      = Font.custom(fontRegular,  size: 11)
-    static let displayFont      = timerMainFont
 
     // spacing — compact density
     static let padding: CGFloat            = 20  // horizontal window body padding
-    static let paddingTop: CGFloat         = 16
     static let sectionSpacing: CGFloat     = 12  // rule margin
     static let groupSpacing: CGFloat       = 10
     static let rowSpacing: CGFloat         = 6
@@ -56,8 +51,6 @@ enum BrutalistTheme {
 extension BrutalistTheme {
     // the `ColorScheme` parameter is ignored — the UI is dark-only.
     static func background(for scheme: ColorScheme) -> Color { bg }
-    static func foreground(for scheme: ColorScheme) -> Color { fg }
-    static func secondary(for scheme: ColorScheme) -> Color { dim2 }
     static func muted(for scheme: ColorScheme) -> Color { dim }
 }
 
@@ -134,5 +127,48 @@ struct DottedLeader: View {
         .frame(height: 1)
         .offset(y: -4)
         .frame(maxWidth: .infinity)
+    }
+}
+
+
+@MainActor
+private enum DateLabels {
+    static let formatters: [TrackerText.DateLabel: DateFormatter] = Dictionary(uniqueKeysWithValues: TrackerText.DateLabel.allCases.map { label in
+        let formatter = DateFormatter()
+        formatter.dateFormat = label.rawValue
+        return (label, formatter)
+    })
+}
+
+@MainActor
+enum TrackerText {
+    enum DateLabel: String, CaseIterable {
+        case time = "HH:mm"
+        case day = "EE dd.MM"
+        case weekday = "EE"
+    }
+
+    static func date(_ date: Date, label: DateLabel, days: DayCalendar) -> String {
+        let formatter = DateLabels.formatters[label]!
+        formatter.calendar = days.calendar
+        formatter.timeZone = days.calendar.timeZone
+        return formatter.string(from: date)
+    }
+
+    static func timer(seconds: Int) -> AttributedString {
+        var text = AttributedString(TimeMath.formatHMS(seconds: seconds))
+        text.foregroundColor = BrutalistTheme.fg
+        var search = text.startIndex
+        while let range = text[search...].range(of: ":") {
+            text[range].foregroundColor = BrutalistTheme.colonDim
+            search = range.upperBound
+        }
+        return text
+    }
+}
+
+extension View {
+    func trackerLabel(font: Font, color: Color, kerning: CGFloat) -> some View {
+        self.font(font).foregroundColor(color).textCase(.uppercase).kerning(kerning)
     }
 }

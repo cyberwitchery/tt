@@ -2,6 +2,13 @@ import XCTest
 @testable import tt
 
 final class TimeMathTests: XCTestCase {
+    func testCompactDurationFormats() {
+        for (seconds, hm, idle) in [(-1, "00:00", "0:00"), (0, "00:00", "0:00"), (61, "00:01", "0:01"), (3660, "01:01", "1:01"), (360_000, "100:00", "100:00")] {
+            XCTAssertEqual(TimeMath.formatHM(seconds: seconds), hm)
+            XCTAssertEqual(TimeMath.formatIdle(seconds: seconds), idle)
+        }
+    }
+
     // MARK: - durationSeconds
 
     func testDurationAcrossDSTUsesAbsoluteTime() {
