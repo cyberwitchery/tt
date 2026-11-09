@@ -3,34 +3,7 @@ import Combine
 import GRDB
 @testable import tt
 
-final class TimeTrackerTests: XCTestCase {
-    var dbQueue: DatabaseQueue!
-    var projectRepository: ProjectRepository!
-    var timeEntryRepository: TimeEntryRepository!
-    var tracker: TimeTracker!
-    private var clock = TestClock()
-
-    override func setUp() {
-        super.setUp()
-        clock = TestClock()
-        dbQueue = try! TestDatabase.makeInMemory()
-        projectRepository = ProjectRepository(dbQueue: dbQueue)
-        timeEntryRepository = TimeEntryRepository(dbQueue: dbQueue)
-        tracker = TimeTracker(
-            projectRepository: projectRepository,
-            timeEntryRepository: timeEntryRepository,
-            days: clock.days
-        )
-    }
-
-    override func tearDown() {
-        dbQueue = nil
-        projectRepository = nil
-        timeEntryRepository = nil
-        tracker = nil
-        super.tearDown()
-    }
-
+final class TimeTrackerTests: TrackerTestCase {
     // MARK: - Initial Load
 
     func testInitialLoadUsesTheInjectedDayForEntriesAndReports() throws {
