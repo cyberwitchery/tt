@@ -299,6 +299,41 @@ final class EntryEditorTests: XCTestCase {
 }
 
 final class EntryEditSessionTests: XCTestCase {
+    func testSaveArgumentsKeepAnEndWrittenAfterTheEditorOpened() throws {
+        let start = Date.from(year: 2026, month: 1, day: 1, hour: 9)
+        let stoppedEnd = start.addingTimeInterval(3600)
+        var session = session()
+        session.begin(TimeEntry(projectId: "p", start: start))
+        session.note = "updated"
+        XCTAssertEqual(session.update(runningEntryId: nil, currentEnd: stoppedEnd)?.end, stoppedEnd)
+        session.endText = "11:00"
+        XCTAssertEqual(session.update(runningEntryId: nil, currentEnd: stoppedEnd)?.end, start.addingTimeInterval(7200))
+    }
+
+    func testSavingAnOpenEditorAfterStopDoesNotReopenTheTimer() throws {
+        let database = try TestDatabase.makeInMemory()
+        let clock = TestClock()
+        clock.now = Date.from(year: 2026, month: 1, day: 1, hour: 9)
+        let entries = TimeEntryRepository(dbQueue: database)
+        let tracker = TimeTracker(projectRepository: ProjectRepository(dbQueue: database), timeEntryRepository: entries, days: clock.days)
+        try tracker.loadInitialState()
+        try tracker.startTimer()
+        let running = try XCTUnwrap(tracker.runningEntry)
+        var session = EntryEditSession(days: clock.days)
+        session.begin(running)
+
+        clock.now = clock.now.addingTimeInterval(3600)
+        try tracker.stopTimer()
+        let stopped = try XCTUnwrap(entries.get(id: running.id))
+        session.note = "saved after stopping"
+        let update = try XCTUnwrap(session.update(runningEntryId: tracker.runningEntry?.id))
+        try tracker.updateEntry(id: update.id, start: update.start, end: update.end, note: update.note, projectId: update.projectId)
+
+        XCTAssertNil(tracker.runningEntry)
+        XCTAssertEqual(try entries.get(id: running.id)?.end, stopped.end)
+        XCTAssertEqual(try entries.get(id: running.id)?.note, "saved after stopping")
+    }
+
     private func session() -> EntryEditSession {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!

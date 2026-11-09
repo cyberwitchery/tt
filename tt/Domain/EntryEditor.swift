@@ -153,10 +153,10 @@ struct EntryEditSession {
         syncTexts()
     }
 
-    func update(runningEntryId: String?) -> Update? {
+    func update(runningEntryId: String?, currentEnd: Date? = nil) -> Update? {
         guard let entry else { return nil }
         let edited = editor.commit(start: startText, end: endText, duration: durationText, to: fields)
-        return Update(id: entry.id, start: edited.start, end: entry.id == runningEntryId ? nil : edited.end,
+        return Update(id: entry.id, start: edited.start, end: entry.id == runningEntryId ? nil : (edited.end ?? currentEnd),
                       note: note, projectId: projectId ?? entry.projectId)
     }
 
