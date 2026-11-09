@@ -8,27 +8,39 @@ final class TimeTracker: ObservableObject {
 
     @Published private(set) var projects: [Project] = []
     private var allProjectNames: [String: String] = [:]
-    @Published private(set) var runningEntry: TimeEntry?
-    private struct LoadedState {
+    private struct LoadedDay {
         let today: DayCalendar.Day
         let selection: DayCalendar.Day
         let offset: Int
-        let todaysEntries: [TimeEntry]
-        let visibleEntries: [TimeEntry]
-        let projectTotals: [ProjectTotal]
-        let recentEntries: [TimeEntry]
-        let completedTotals: [String: Int]
-        let lastEntryEnd: Date?
     }
 
-    @Published private var loaded: LoadedState?
-    var todaysEntries: [TimeEntry] { loaded?.todaysEntries ?? [] }
-    var visibleEntries: [TimeEntry] { loaded?.visibleEntries ?? [] }
+    private struct TrackingState {
+        var runningEntry: TimeEntry?
+        var loaded: LoadedDay?
+        var entries: [TimeEntry] = []
+        var completedTotals: [String: Int] = [:]
+        var lastEntryEnd: Date?
+    }
+
+    @Published private var state = TrackingState()
+    private var loaded: LoadedDay? { state.loaded }
+    var runningEntry: TimeEntry? { state.runningEntry }
+    var todaysEntries: [TimeEntry] { cachedEntries(in: days.today.range) }
+    var visibleEntries: [TimeEntry] { cachedEntries(in: loaded?.selection.range ?? days.today.range) }
+
+    private func cachedEntries(in range: Range<Date>) -> [TimeEntry] {
+        state.entries.filter { $0.start < range.upperBound && ($0.end.map { $0 > range.lowerBound } ?? true) }
+    }
     /// Offset from the day of the last successful load, committed with its entries.
     var dayOffset: Int { loaded?.offset ?? 0 }
-    var projectTotalsForSelectedDay: [ProjectTotal] { loaded?.projectTotals ?? [] }
-    var projectCompletedTotals: [String: Int] { loaded?.completedTotals ?? [:] }
-    var lastEntryEnd: Date? { loaded?.lastEntryEnd }
+    var projectTotalsForSelectedDay: [ProjectTotal] {
+        let selection = loaded?.selection ?? days.today
+        return ReportBuilder.projectTotals(entries: visibleEntries, rangeStart: selection.start,
+                                           rangeEnd: selection.end, now: days.now,
+                                           projectNameForId: { self.projectName(for: $0) })
+    }
+    var projectCompletedTotals: [String: Int] { state.completedTotals }
+    var lastEntryEnd: Date? { state.lastEntryEnd }
     @Published var selectedProjectId: String?
 
     var startedAt: Date? { runningEntry?.start }
@@ -84,7 +96,7 @@ final class TimeTracker: ObservableObject {
     func recentDayTotals() -> [DayTotal] {
         let now = days.now
         return ReportBuilder.dayTotals(
-            entries: loaded?.recentEntries ?? [],
+            entries: state.entries,
             week: days.week(endingOn: now),
             now: now
         )
@@ -122,7 +134,7 @@ final class TimeTracker: ObservableObject {
         let defaultProject = try projectRepository.ensureDefaultProject()
         try loadProjects()
         selectedProjectId = defaultProject.id
-        runningEntry = try timeEntryRepository.fetchRunning()
+        state.runningEntry = try timeEntryRepository.fetchRunning()
         try reload(at: days.now, offset: 0)
     }
 
@@ -133,17 +145,16 @@ final class TimeTracker: ObservableObject {
         guard let projectId = selectedProjectId else { return }
 
         let now = days.now
-        let entry = TimeEntry(projectId: projectId, start: now)
-        try timeEntryRepository.insertRunning(entry: entry)
-        runningEntry = entry
+        let entry = try timeEntryRepository.insertRunning(entry: TimeEntry(projectId: projectId, start: now))
+        reflectCommitted(entry, replacing: nil)
         try reload(at: now, offset: 0)
     }
 
     func stopTimer() throws {
         guard let entry = runningEntry else { return }
         let now = days.now
-        _ = try timeEntryRepository.stopRunning(entry: entry, end: now)
-        runningEntry = nil
+        let stopped = try timeEntryRepository.stopRunning(entry: entry, end: now)
+        reflectCommitted(stopped, replacing: entry)
         try reload(at: now, offset: 0)
     }
 
@@ -187,6 +198,7 @@ final class TimeTracker: ObservableObject {
     func updateEntry(id: String, start: Date, end: Date?, note: String?, projectId: String? = nil) throws {
         let sanitizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
         guard var entry = try timeEntryRepository.get(id: id) else { return }
+        let previous = entry
         // An editor opened while running may still submit nil after the timer stopped.
         let normalizedEnd = (end ?? entry.end).map { max($0, start) }
         entry.start = start
@@ -195,15 +207,18 @@ final class TimeTracker: ObservableObject {
         if let projectId, projects.contains(where: { $0.id == projectId }) {
             entry.projectId = projectId
         }
-        try timeEntryRepository.update(entry)
-        runningEntry = try timeEntryRepository.fetchRunning()
+        let saved = try timeEntryRepository.update(entry)
+        reflectCommitted(saved, replacing: previous)
+        state.runningEntry = try timeEntryRepository.fetchRunning()
         let now = days.now
         try reload(at: now, offset: offsetForReload(at: now))
     }
 
     func deleteEntry(id: String) throws {
+        let previous = try timeEntryRepository.get(id: id)
         try timeEntryRepository.delete(id: id)
-        runningEntry = try timeEntryRepository.fetchRunning()
+        reflectCommitted(nil, replacing: previous)
+        state.runningEntry = try timeEntryRepository.fetchRunning()
         let now = days.now
         try reload(at: now, offset: offsetForReload(at: now))
     }
@@ -226,29 +241,55 @@ final class TimeTracker: ObservableObject {
     }
 
     func refreshEntries() throws {
-        try reload(at: days.now, offset: dayOffset)
+        let now = days.now
+        try reload(at: now, offset: offsetForReload(at: now))
     }
 
     func refreshReports() throws {
-        try reload(at: days.now, offset: dayOffset)
+        let now = days.now
+        try reload(at: now, offset: offsetForReload(at: now))
     }
 
     private func reload(at now: Date, offset: Int) throws {
         // Finish every read before publishing selection, entries or totals.
         let today = days.day(containing: now)
         let selection = days.day(byAdding: offset, to: today)
-        let todayEntries = try timeEntryRepository.fetchEntries(on: today)
-        let visible = offset == 0 ? todayEntries : try timeEntryRepository.fetchEntries(on: selection)
-        let recent = try timeEntryRepository.fetchEntries(in: days.week(endingOn: now).range)
+        let recentRange = days.week(endingOn: now).range
+        let recent = try timeEntryRepository.fetchEntries(in: recentRange)
+        let visible = recentRange.contains(selection.start) ? [] : try timeEntryRepository.fetchEntries(on: selection)
+        var byId = Dictionary(uniqueKeysWithValues: recent.map { ($0.id, $0) })
+        for entry in visible { byId[entry.id] = entry }
+        let entries = byId.values.sorted { $0.start > $1.start }
         let completed = try timeEntryRepository.fetchCompletedTotalsByProject()
         let last = try timeEntryRepository.fetchMostRecentlyEnded()?.end
-        let totals = ReportBuilder.projectTotals(
-            entries: visible, rangeStart: selection.start, rangeEnd: selection.end, now: now,
-            projectNameForId: { self.projectName(for: $0) }
-        )
-        loaded = LoadedState(today: today, selection: selection, offset: offset, todaysEntries: todayEntries,
-                             visibleEntries: visible, projectTotals: totals, recentEntries: recent,
-                             completedTotals: completed, lastEntryEnd: last)
+        state = TrackingState(runningEntry: runningEntry, loaded: LoadedDay(today: today, selection: selection, offset: offset),
+                              entries: entries, completedTotals: completed, lastEntryEnd: last)
+    }
+
+    /// A successful write is authoritative even if a subsequent read fails.
+    private func reflectCommitted(_ entry: TimeEntry?, replacing previous: TimeEntry?) {
+        guard let id = entry?.id ?? previous?.id else { return }
+        var next = state
+        if let entry, entry.end == nil { next.runningEntry = entry }
+        else if next.runningEntry?.id == id { next.runningEntry = nil }
+
+        next.entries.removeAll { $0.id == id }
+        if let entry { next.entries.append(entry) }
+        next.entries.sort { $0.start > $1.start }
+        if let previous, let end = previous.end {
+            let duration = TimeMath.durationSeconds(start: previous.start, end: end)
+            next.completedTotals[previous.projectId] = max(0, (next.completedTotals[previous.projectId] ?? 0) - duration)
+        }
+        if let entry, let end = entry.end {
+            next.completedTotals[entry.projectId, default: 0] += TimeMath.durationSeconds(start: entry.start, end: end)
+        }
+        if let previousEnd = previous?.end, previousEnd == next.lastEntryEnd, entry?.end != previousEnd {
+            // The next latest end is unknown until reads recover.
+            next.lastEntryEnd = nil
+        } else if let end = entry?.end {
+            next.lastEntryEnd = max(next.lastEntryEnd ?? end, end)
+        }
+        state = next
     }
 
     func projectAllTimeSeconds(for projectId: String) -> Int {
