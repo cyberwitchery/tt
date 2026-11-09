@@ -122,6 +122,11 @@ struct EntryEditSession {
     var projectPickerOpen = false
     var entryId: String? { entry?.id }
 
+    var endDayOffset: Int {
+        guard let update = update(runningEntryId: nil), let end = update.end else { return 0 }
+        return editor.days.daysBetween(editor.days.day(containing: update.start), and: editor.days.day(containing: end))
+    }
+
     init(days: DayCalendar) { editor = EntryEditor(days: days) }
 
     mutating func begin(_ entry: TimeEntry) {

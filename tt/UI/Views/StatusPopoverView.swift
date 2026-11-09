@@ -7,9 +7,15 @@ struct StatusPopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
+            if let error = appState.storageError {
+                Text(error).font(BrutalistTheme.metaFont).foregroundColor(BrutalistTheme.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             projectRow
+                .disabled(!appState.isStorageAvailable)
                 .zIndex(10) // dropdown floats above timer/footer
             timerRow
+                .disabled(!appState.isStorageAvailable)
             Rectangle()
                 .frame(height: 1)
                 .foregroundColor(BrutalistTheme.rule)

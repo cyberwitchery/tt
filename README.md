@@ -31,6 +31,7 @@ indicator shows time since the most recently ended entry.
 - start and end accept `HH:MM`; duration accepts `HH:MM` or `HH:MM:SS`
 - an end before the start falls on the next calendar day; durations are elapsed
   time, including daylight-saving changes
+- the end label shows `+1d` when an entry ends on the following day
 - changing start keeps duration; changing end or duration keeps start
 - editing a running entry keeps it running
 - delete an entry from inside its editor; deletion is immediate
@@ -40,7 +41,8 @@ indicator shows time since the most recently ended entry.
   there is no restore action
 
 errors appear above the timer in the main window. failed reads retain the last
-loaded entries and totals.
+loaded entries and totals. if the database cannot open, the error stays visible
+and tracking controls are disabled; tt does not switch to a temporary database.
 
 ## keyboard
 

@@ -170,12 +170,15 @@ final class TimeTracker: ObservableObject {
         selectedProjectId = id
     }
 
-    func createProject(name: String) throws {
+    @discardableResult
+    func createProject(name: String) throws -> Project? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty else { return nil }
 
-        try projectRepository.insert(Project(name: trimmed.lowercased()))
+        let project = Project(name: trimmed.lowercased())
+        try projectRepository.insert(project)
         try refreshProjects()
+        return project
     }
 
     func archiveProject(id: String) throws {
@@ -201,7 +204,6 @@ final class TimeTracker: ObservableObject {
             entry.projectId = projectId
         }
         try timeEntryRepository.update(entry)
-        try timeEntryRepository.resolveMultipleRunningEntries()
         runningEntry = try timeEntryRepository.fetchRunning()
         try reload(at: days.now)
     }

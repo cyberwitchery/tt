@@ -4,6 +4,31 @@ import GRDB
 @testable import tt
 
 final class TimeTrackerTests: TrackerTestCase {
+    func testCreatedProjectsReturnTheirOwnIDsEvenWithDuplicateNames() throws {
+        try tracker.loadInitialState()
+        let first = try XCTUnwrap(tracker.createProject(name: " Same "))
+        let second = try XCTUnwrap(tracker.createProject(name: "same"))
+        XCTAssertNotEqual(first.id, second.id)
+        XCTAssertEqual(first.name, "same")
+        XCTAssertEqual(second.name, "same")
+        XCTAssertTrue(tracker.projects.contains { $0.id == second.id })
+        XCTAssertNil(try tracker.createProject(name: "  "))
+    }
+
+    func testUpdatingAnUnrelatedEntryDoesNotCloseOtherRunningEntries() throws {
+        try tracker.loadInitialState()
+        let project = try XCTUnwrap(tracker.projects.first)
+        let start = Date.from(year: 2026, month: 1, day: 1, hour: 9)
+        let first = TimeEntry(projectId: project.id, start: start)
+        let second = TimeEntry(projectId: project.id, start: start + 60)
+        let ended = TimeEntry(projectId: project.id, start: start - 3600, end: start)
+        for entry in [first, second, ended] { try timeEntryRepository.insertRunning(entry: entry) }
+        try tracker.updateEntry(id: ended.id, start: ended.start, end: ended.end, note: "edited")
+        XCTAssertNil(try timeEntryRepository.get(id: first.id)?.end)
+        XCTAssertNil(try timeEntryRepository.get(id: second.id)?.end)
+        XCTAssertEqual(try timeEntryRepository.get(id: ended.id)?.note, "edited")
+    }
+
     // MARK: - Initial Load
 
     func testInitialLoadUsesTheInjectedDayForEntriesAndReports() throws {

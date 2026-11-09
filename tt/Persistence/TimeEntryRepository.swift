@@ -33,6 +33,10 @@ final class TimeEntryRepository {
 
     func update(_ entry: TimeEntry) throws {
         try dbQueue.write { db in
+            if entry.end == nil,
+               try TimeEntry.filter(Column("end") == nil && Column("id") != entry.id).fetchCount(db) > 0 {
+                throw TimeEntryError.anotherTimerRunning
+            }
             try entry.update(db)
         }
     }
@@ -69,7 +73,11 @@ final class TimeEntryRepository {
         try dbQueue.read { db in
             let rows = try Row.fetchAll(db, sql: """
                 SELECT projectId, \
-                SUM(CAST(MAX(0, strftime('%s', "end") - strftime('%s', start)) AS INTEGER)) \
+                SUM(MAX(0, \
+                    (CAST(strftime('%s', "end") AS INTEGER) - CAST(strftime('%s', start) AS INTEGER)) * 1000 \
+                    + CAST(substr(strftime('%f', "end"), 4, 3) AS INTEGER) \
+                    - CAST(substr(strftime('%f', start), 4, 3) AS INTEGER) \
+                ) / 1000) \
                 AS totalSeconds \
                 FROM time_entries \
                 WHERE "end" IS NOT NULL \
