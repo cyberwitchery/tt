@@ -1,4 +1,5 @@
 import Foundation
+import XCTest
 import GRDB
 @testable import tt
 
@@ -11,31 +12,33 @@ final class TestClock {
 
 enum TestDatabase {
     static func makeInMemory() throws -> DatabaseQueue {
-        let dbQueue = try DatabaseQueue()
+        try DatabaseManager().dbQueue
+    }
+}
 
-        var migrator = DatabaseMigrator()
 
-        migrator.registerMigration("createProjects") { db in
-            try db.create(table: Project.databaseTableName) { t in
-                t.column("id", .text).primaryKey()
-                t.column("name", .text).notNull()
-                t.column("archived", .boolean).notNull().defaults(to: false)
-                t.column("createdAt", .datetime).notNull()
-            }
-        }
+class TrackerTestCase: XCTestCase {
+    var dbQueue: DatabaseQueue!
+    var projectRepository: ProjectRepository!
+    var timeEntryRepository: TimeEntryRepository!
+    var tracker: TimeTracker!
+    var clock = TestClock()
 
-        migrator.registerMigration("createTimeEntries") { db in
-            try db.create(table: TimeEntry.databaseTableName) { t in
-                t.column("id", .text).primaryKey()
-                t.column("projectId", .text).notNull().indexed()
-                t.column("start", .datetime).notNull()
-                t.column("end", .datetime)
-                t.column("note", .text)
-            }
-        }
+    override func setUp() {
+        super.setUp()
+        clock = TestClock()
+        dbQueue = try! TestDatabase.makeInMemory()
+        projectRepository = ProjectRepository(dbQueue: dbQueue)
+        timeEntryRepository = TimeEntryRepository(dbQueue: dbQueue)
+        tracker = TimeTracker(projectRepository: projectRepository, timeEntryRepository: timeEntryRepository, days: clock.days)
+    }
 
-        try migrator.migrate(dbQueue)
-        return dbQueue
+    override func tearDown() {
+        tracker = nil
+        timeEntryRepository = nil
+        projectRepository = nil
+        dbQueue = nil
+        super.tearDown()
     }
 }
 

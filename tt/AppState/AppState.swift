@@ -4,7 +4,7 @@ import GRDB
 
 @MainActor
 final class AppState: ObservableObject {
-    static let shared = AppState()
+    static let shared = AppState(database: DatabaseManager.shared)
 
     private let tracker: TimeTracker
     var days: DayCalendar { tracker.days }
@@ -26,12 +26,12 @@ final class AppState: ObservableObject {
     @Published private(set) var lastError: String?
     private var errorDismissTask: Task<Void, Never>?
 
-    private init() {
+    init(database: Result<DatabaseManager, Error>, days: DayCalendar = DayCalendar()) {
         let dbQueue: DatabaseQueue
         var dbError: Error?
 
         do {
-            dbQueue = try DatabaseManager.shared.get().dbQueue
+            dbQueue = try database.get().dbQueue
         } catch {
             dbError = error
             // in-memory fallback so the UI still renders (data won't persist).
@@ -44,16 +44,15 @@ final class AppState: ObservableObject {
         let timeEntryRepository = TimeEntryRepository(dbQueue: dbQueue)
         self.tracker = TimeTracker(
             projectRepository: projectRepository,
-            timeEntryRepository: timeEntryRepository
+            timeEntryRepository: timeEntryRepository,
+            days: days
         )
         observeTracker()
 
-        Task {
-            if let dbError {
-                self.surfaceError(dbError)
-            }
-            self.loadInitialState()
+        if let dbError {
+            surfaceError(dbError)
         }
+        loadInitialState()
     }
 
     // for testing only
