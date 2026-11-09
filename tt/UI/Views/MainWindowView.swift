@@ -9,14 +9,7 @@ struct MainWindowView: View {
 
     @State private var confirmingStop = false
 
-    @State private var editingEntryId: String?
-    @State private var editFields = EntryEditor.Fields(start: .distantPast, end: nil)
-    @State private var editProjectId: String?
-    @State private var editNote = ""
-    @State private var editStartText = ""
-    @State private var editEndText = ""
-    @State private var editDurText = ""
-    @State private var editProjectPickerOpen = false
+    @State private var editSession: EntryEditSession
 
     @State private var addingProject = false
     @State private var newProjectName = ""
@@ -26,10 +19,9 @@ struct MainWindowView: View {
     @State private var exportStart: Date
     @State private var exportEnd: Date
 
-    private var editor: EntryEditor { EntryEditor(days: appState.days) }
-
     init(appState: AppState) {
         self.appState = appState
+        _editSession = State(initialValue: EntryEditSession(days: appState.days))
         let now = appState.days.now
         _exportStart = State(initialValue: appState.days.monthStart(containing: now))
         _exportEnd = State(initialValue: now)
@@ -94,7 +86,7 @@ struct MainWindowView: View {
         .environment(\.timeZone, appState.days.calendar.timeZone)
         .onTapGesture {
             if projectPickerOpen { projectPickerOpen = false }
-            if editProjectPickerOpen { editProjectPickerOpen = false }
+            if editSession.projectPickerOpen { editSession.projectPickerOpen = false }
         }
     }
 
@@ -136,7 +128,7 @@ struct MainWindowView: View {
             return nil
         case KeyCode.e: // edit currently running entry
             if let running = appState.runningEntry {
-                beginEdit(running)
+                editSession.begin(running)
             }
             return nil
         case KeyCode.leftArrow: // browse to the previous day
@@ -146,12 +138,12 @@ struct MainWindowView: View {
             showDay(step: 1)
             return nil
         case KeyCode.t: // back to today
-            clearEdit()
+            editSession.clear()
             appState.showToday()
             return nil
         case KeyCode.escape: // close open editor/picker/confirm, in priority order
-            if editingEntryId != nil { clearEdit(); return nil }
-            if editProjectPickerOpen { editProjectPickerOpen = false; return nil }
+            if editSession.entryId != nil { editSession.clear(); return nil }
+            if editSession.projectPickerOpen { editSession.projectPickerOpen = false; return nil }
             if projectPickerOpen { startAfterProjectPick = false; projectPickerOpen = false; return nil }
             if confirmingStop { confirmingStop = false; return nil }
             if confirmingArchiveId != nil { confirmingArchiveId = nil; return nil }
@@ -288,7 +280,7 @@ struct MainWindowView: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 BrutalistTextButton(title: "←") { showDay(step: -1) }
                 Button {
-                    clearEdit()
+                    editSession.clear()
                     appState.showToday()
                 } label: {
                     SectionHeader(title: dayLabel)
@@ -320,7 +312,7 @@ struct MainWindowView: View {
                     .foregroundColor(BrutalistTheme.dim)
             } else {
                 ForEach(appState.visibleEntries) { entry in
-                    if editingEntryId == entry.id {
+                    if editSession.entryId == entry.id {
                         entryEditor(for: entry)
                     } else {
                         entryRow(entry)
@@ -337,7 +329,7 @@ struct MainWindowView: View {
 
     private func showDay(step: Int) {
         guard step < 0 || !appState.isViewingToday else { return }
-        clearEdit()
+        editSession.clear()
         appState.stepDay(by: step)
     }
 
@@ -374,7 +366,7 @@ struct MainWindowView: View {
             }
 
             BrutalistTextButton(title: "edit", muted: true) {
-                beginEdit(entry)
+                editSession.begin(entry)
             }
         }
         .padding(.vertical, BrutalistTheme.rowVerticalPadding)
@@ -386,9 +378,9 @@ struct MainWindowView: View {
     private func entryEditor(for entry: TimeEntry) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
-                editField(label: "start", text: $editStartText, width: 58, onCommit: commitStart)
-                editField(label: "end", text: $editEndText, width: 58, onCommit: commitEnd)
-                editField(label: "dur", text: $editDurText, width: 82, onCommit: commitDur)
+                editField(label: "start", text: $editSession.startText, width: 58, onCommit: { editSession.commit(.start) })
+                editField(label: "end", text: $editSession.endText, width: 58, onCommit: { editSession.commit(.end) })
+                editField(label: "dur", text: $editSession.durationText, width: 82, onCommit: { editSession.commit(.duration) })
                 Spacer()
             }
             HStack(spacing: 8) {
@@ -408,7 +400,7 @@ struct MainWindowView: View {
                         .foregroundColor(BrutalistTheme.dim)
                         .textCase(.uppercase)
                         .kerning(1.5)
-                    TextField("", text: $editNote)
+                    TextField("", text: $editSession.note)
                         .textFieldStyle(.plain)
                         .font(BrutalistTheme.bodyFont)
                         .foregroundColor(BrutalistTheme.fg)
@@ -423,11 +415,11 @@ struct MainWindowView: View {
             HStack {
                 BrutalistTextButton(title: "delete entry", danger: true) {
                     appState.deleteEntry(id: entry.id)
-                    clearEdit()
+                    editSession.clear()
                 }
                 Spacer()
                 BrutalistTextButton(title: "cancel", muted: true) {
-                    clearEdit()
+                    editSession.clear()
                 }
                 BrutalistTextButton(title: "save") {
                     saveEdit(entry)
@@ -466,67 +458,24 @@ struct MainWindowView: View {
         HeaderProjectPicker(
             projects: appState.projects,
             selectedId: Binding(
-                get: { editProjectId },
-                set: { editProjectId = $0 }
+                get: { editSession.projectId },
+                set: { editSession.projectId = $0 }
             ),
             allTimeSeconds: { appState.projectAllTimeSeconds(for: $0) },
             onCreateProject: { name in
                 appState.createProject(name: name)
                 if let created = appState.projects.last(where: { $0.name.lowercased() == name.lowercased() }) {
-                    editProjectId = created.id
+                    editSession.projectId = created.id
                 }
             },
-            isOpen: $editProjectPickerOpen
+            isOpen: $editSession.projectPickerOpen
         )
-    }
-
-    private func beginEdit(_ entry: TimeEntry) {
-        editingEntryId = entry.id
-        editProjectId = entry.projectId
-        editNote = entry.note ?? ""
-        editFields = editor.fields(start: entry.start, end: entry.end)
-        syncEditTexts()
-    }
-
-    private func clearEdit() {
-        editingEntryId = nil
-        editProjectPickerOpen = false
-        editNote = ""
-    }
-
-    private func syncEditTexts() {
-        editStartText = editor.text(.start, of: editFields)
-        editEndText = editor.text(.end, of: editFields)
-        editDurText = editor.text(.duration, of: editFields)
-    }
-
-    private func commitStart() {
-        editFields = editor.commit(editStartText, to: .start, of: editFields)
-        syncEditTexts()
-    }
-
-    private func commitEnd() {
-        editFields = editor.commit(editEndText, to: .end, of: editFields)
-        syncEditTexts()
-    }
-
-    private func commitDur() {
-        editFields = editor.commit(editDurText, to: .duration, of: editFields)
-        syncEditTexts()
     }
 
     private func saveEdit(_ entry: TimeEntry) {
-        let fields = editor.commit(start: editStartText, end: editEndText, duration: editDurText, to: editFields)
-        let isRunning = appState.runningEntry?.id == entry.id
-        let newProjectId = editProjectId ?? entry.projectId
-        appState.updateEntry(
-            id: entry.id,
-            start: fields.start,
-            end: isRunning ? nil : fields.end,
-            note: editNote,
-            projectId: newProjectId
-        )
-        clearEdit()
+        guard let update = editSession.update(runningEntryId: appState.runningEntry?.id, currentEnd: entry.end) else { return }
+        appState.updateEntry(id: update.id, start: update.start, end: update.end, note: update.note, projectId: update.projectId)
+        editSession.clear()
     }
 
     // MARK: - Projects

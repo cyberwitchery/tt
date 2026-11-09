@@ -100,3 +100,64 @@ struct EntryEditor {
         return String(format: "%02d:%02d:%02d", h, m, s)
     }
 }
+
+
+struct EntryEditSession {
+    struct Update: Equatable {
+        let id: String
+        let start: Date
+        let end: Date?
+        let note: String
+        let projectId: String
+    }
+
+    private let editor: EntryEditor
+    private var entry: TimeEntry?
+    private var fields = EntryEditor.Fields(start: .distantPast, end: nil)
+    var projectId: String?
+    var note = ""
+    var startText = ""
+    var endText = ""
+    var durationText = ""
+    var projectPickerOpen = false
+    var entryId: String? { entry?.id }
+
+    init(days: DayCalendar) { editor = EntryEditor(days: days) }
+
+    mutating func begin(_ entry: TimeEntry) {
+        clear()
+        self.entry = entry
+        projectId = entry.projectId
+        note = entry.note ?? ""
+        fields = editor.fields(start: entry.start, end: entry.end)
+        syncTexts()
+    }
+
+    mutating func clear() {
+        self = EntryEditSession(days: editor.days)
+    }
+
+    mutating func commit(_ field: EntryEditor.Field) {
+        let text: String
+        switch field {
+        case .start: text = startText
+        case .end: text = endText
+        case .duration: text = durationText
+        }
+        fields = editor.commit(text, to: field, of: fields)
+        syncTexts()
+    }
+
+    func update(runningEntryId: String?, currentEnd: Date? = nil) -> Update? {
+        guard let entry else { return nil }
+        let edited = editor.commit(start: startText, end: endText, duration: durationText, to: fields)
+        return Update(id: entry.id, start: edited.start, end: entry.id == runningEntryId ? nil : (edited.end ?? currentEnd),
+                      note: note, projectId: projectId ?? entry.projectId)
+    }
+
+    private mutating func syncTexts() {
+        startText = editor.text(.start, of: fields)
+        endText = editor.text(.end, of: fields)
+        durationText = editor.text(.duration, of: fields)
+    }
+}
