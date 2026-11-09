@@ -191,7 +191,7 @@ final class TimeTracker: ObservableObject {
     }
 
     // MARK: - Entry Management
-    
+
     func updateEntry(id: String, start: Date, end: Date?, note: String?, projectId: String? = nil) throws {
         let sanitizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedEnd = end.map { max($0, start) }
