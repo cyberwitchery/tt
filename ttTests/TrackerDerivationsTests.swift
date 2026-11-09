@@ -3,6 +3,152 @@ import GRDB
 @testable import tt
 
 final class TrackerDerivationsTests: TrackerTestCase {
+    func testCommittedTimerIsCountedEvenWhenTheFirstReportLoadFails() throws {
+        clock.now = Date.from(year: 2026, month: 1, day: 2, hour: 12)
+        let project = Project(name: "tracked")
+        let history = Project(name: "history")
+        try projectRepository.insert(project)
+        try projectRepository.insert(history)
+        try timeEntryRepository.insertRunning(entry: TimeEntry(projectId: history.id, start: clock.now - 10 * 86400, end: clock.now - 10 * 86400 + 3600))
+        let failReports = DatabaseFunction("strftime", argumentCount: 2) { _ -> String? in
+            throw DatabaseError(resultCode: .SQLITE_ERROR, message: "injected report failure")
+        }
+        try dbQueue.write { $0.add(function: failReports) }
+        XCTAssertThrowsError(try tracker.loadInitialState())
+        XCTAssertThrowsError(try tracker.startTimer())
+        clock.now = clock.now.addingTimeInterval(120)
+        XCTAssertThrowsError(try tracker.stopTimer())
+        clock.now = clock.now.addingTimeInterval(60)
+
+        XCTAssertNil(tracker.runningEntry)
+        XCTAssertEqual(tracker.todayTotalSeconds(), 120)
+        XCTAssertEqual(tracker.visibleDayTotalSeconds(), 120)
+        XCTAssertEqual(tracker.recentTotalSeconds(), 120)
+        XCTAssertEqual(tracker.projectAllTimeSeconds(for: project.id), 120)
+    }
+
+    func testKnownTimerWritesAcrossMidnightRemainClippedWhenReportsFail() throws {
+        for action in ["start", "stop"] {
+            let clock = TestClock()
+            clock.calendar = Calendar(identifier: .gregorian)
+            clock.calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+            clock.now = Date.from(year: 2026, month: 1, day: 2, hour: 23, minute: 59)
+            let database = try TestDatabase.makeInMemory()
+            let entries = TimeEntryRepository(dbQueue: database)
+            let tracker = TimeTracker(projectRepository: ProjectRepository(dbQueue: database), timeEntryRepository: entries, days: clock.days)
+            try tracker.loadInitialState()
+            let projectId = tracker.projects[0].id
+            try entries.insertRunning(entry: TimeEntry(projectId: projectId, start: clock.now - 10 * 86400, end: clock.now - 10 * 86400 + 3600))
+            try tracker.refreshReports()
+            if action == "stop" { try tracker.startTimer() }
+            let selected = tracker.selectedDay()
+            clock.now = clock.now.addingTimeInterval(120)
+            let failReports = DatabaseFunction("strftime", argumentCount: 2) { _ -> String? in
+                throw DatabaseError(resultCode: .SQLITE_ERROR, message: "injected report failure")
+            }
+            try database.write { $0.add(function: failReports) }
+            if action == "stop" { XCTAssertThrowsError(try tracker.stopTimer()) }
+            else { XCTAssertThrowsError(try tracker.startTimer()) }
+            clock.now = clock.now.addingTimeInterval(60)
+
+            XCTAssertEqual(tracker.selectedDay(), selected, action)
+            XCTAssertEqual(tracker.todayTotalSeconds(), 60, action)
+            XCTAssertEqual(tracker.visibleDayTotalSeconds(), action == "stop" ? 60 : 0, action)
+            XCTAssertEqual(tracker.recentTotalSeconds(), action == "stop" ? 120 : 60, action)
+            XCTAssertEqual(tracker.projectAllTimeSeconds(for: projectId), action == "stop" ? 3720 : 3660, action)
+        }
+    }
+
+    func testEveryRefreshPathKeepsABrowsedDateAcrossMidnight() throws {
+        for action in ["entries", "reports", "create", "archive"] {
+            let clock = TestClock()
+            clock.calendar = Calendar(identifier: .gregorian)
+            clock.calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+            clock.now = Date.from(year: 2026, month: 1, day: 2, hour: 23)
+            let database = try TestDatabase.makeInMemory()
+            let projects = ProjectRepository(dbQueue: database)
+            let entries = TimeEntryRepository(dbQueue: database)
+            let tracker = TimeTracker(projectRepository: projects, timeEntryRepository: entries, days: clock.days)
+            try tracker.loadInitialState()
+            let archive = Project(name: "archive")
+            try projects.insert(archive)
+            let start = Date.from(year: 2026, month: 1, day: 1, hour: 9)
+            let entry = TimeEntry(projectId: tracker.projects[0].id, start: start, end: start + 3600)
+            try entries.insertRunning(entry: entry)
+            try tracker.stepDay(by: -1)
+            let selected = tracker.selectedDay()
+            clock.now = Date.from(year: 2026, month: 1, day: 3, hour: 0, minute: 30)
+
+            switch action {
+            case "entries": try tracker.refreshEntries()
+            case "reports": try tracker.refreshReports()
+            case "create": try tracker.createProject(name: "new")
+            default: try tracker.archiveProject(id: archive.id)
+            }
+
+            XCTAssertEqual(tracker.selectedDay(), selected, action)
+            XCTAssertEqual(tracker.dayOffset, -2, action)
+            XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id], action)
+            XCTAssertEqual(tracker.visibleDayTotalSeconds(), 3600, action)
+            XCTAssertFalse(try tracker.rollOverIfNeeded(), action)
+        }
+    }
+
+    func testCommittedEntryChangesStayReflectedWhenReportReadsFail() throws {
+        for action in ["start", "stop", "edit", "delete"] {
+            let clock = TestClock()
+            clock.calendar = Calendar(identifier: .gregorian)
+            clock.calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+            clock.now = Date.from(year: 2026, month: 1, day: 2, hour: 12)
+            let database = try TestDatabase.makeInMemory()
+            let projects = ProjectRepository(dbQueue: database)
+            let entries = TimeEntryRepository(dbQueue: database)
+            let tracker = TimeTracker(projectRepository: projects, timeEntryRepository: entries, days: clock.days)
+            try tracker.loadInitialState()
+            let projectId = tracker.projects[0].id
+            let history = Project(name: "history")
+            try projects.insert(history)
+            try entries.insertRunning(entry: TimeEntry(projectId: history.id, start: clock.now - 10 * 86400, end: clock.now - 10 * 86400 + 3600))
+            try tracker.refreshProjects()
+            if action != "start" {
+                try tracker.startTimer()
+                clock.now = clock.now.addingTimeInterval(120)
+                try tracker.refreshEntries()
+            }
+            let running = tracker.runningEntry
+            let failReports = DatabaseFunction("strftime", argumentCount: 2) { _ -> String? in
+                throw DatabaseError(resultCode: .SQLITE_ERROR, message: "injected report failure")
+            }
+            try database.write { $0.add(function: failReports) }
+
+            switch action {
+            case "start": XCTAssertThrowsError(try tracker.startTimer())
+            case "stop": XCTAssertThrowsError(try tracker.stopTimer())
+            case "edit":
+                let entry = try XCTUnwrap(running)
+                XCTAssertThrowsError(try tracker.updateEntry(id: entry.id, start: entry.start, end: clock.now, note: "closed"))
+            default: XCTAssertThrowsError(try tracker.deleteEntry(id: XCTUnwrap(running).id))
+            }
+
+            let expected = action == "start" ? 60 : (action == "delete" ? 0 : 120)
+            if let running, action != "delete" {
+                XCTAssertEqual(try entries.get(id: running.id)?.end, clock.now, action)
+            }
+            clock.now = clock.now.addingTimeInterval(60)
+            XCTAssertEqual(tracker.todayTotalSeconds(), expected, action)
+            XCTAssertEqual(tracker.visibleDayTotalSeconds(), expected, action)
+            XCTAssertEqual(tracker.recentTotalSeconds(), expected, action)
+            XCTAssertEqual(tracker.projectTotalsForSelectedDay.reduce(0) { $0 + $1.seconds }, expected, action)
+            XCTAssertEqual(tracker.projectAllTimeSeconds(for: projectId), expected, action)
+            XCTAssertEqual(tracker.projectAllTimeSeconds(for: history.id), 3600, action)
+            if action != "start" {
+                XCTAssertNil(tracker.runningEntry, action)
+                XCTAssertTrue(tracker.visibleEntries.allSatisfy { $0.end != nil }, action)
+                XCTAssertTrue(tracker.todaysEntries.allSatisfy { $0.end != nil }, action)
+            }
+        }
+    }
+
     func testFailedMidnightRefreshDoesNotApplyTheDayShiftAgainOnRetry() throws {
         clock.calendar = Calendar(identifier: .gregorian)
         clock.calendar.timeZone = TimeZone(secondsFromGMT: 0)!
@@ -514,6 +660,7 @@ final class TrackerDerivationsTests: TrackerTestCase {
     }
 
     func testRollOverHoldsABrowsedDayOnItsOwnDate() throws {
+        clock.now = time(daysAgo: 1, hour: 23)
         try tracker.loadInitialState()
         let older = try insert(daysAgo: 2, from: 9, to: 10)
         try tracker.stepDay(by: -1)
@@ -530,12 +677,14 @@ final class TrackerDerivationsTests: TrackerTestCase {
     }
 
     func testRollOverOutOfADayWithoutAMidnightHoldsABrowsedDayOnItsOwnDate() throws {
-        try tracker.loadInitialState()
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "America/Santiago")!
         func santiago(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
             calendar.date(from: DateComponents(year: 2024, month: 9, day: day, hour: hour, minute: minute))!
         }
+        clock.calendar = calendar
+        clock.now = santiago(8, 23)
+        try tracker.loadInitialState()
         let older = TimeEntry(projectId: tracker.projects[0].id, start: santiago(7, 9), end: santiago(7, 10))
         try timeEntryRepository.insertRunning(entry: older)
         try tracker.stepDay(by: -1)
@@ -568,6 +717,8 @@ final class TrackerDerivationsTests: TrackerTestCase {
             (.buddhist, "Europe/Berlin", .islamicCivil, 11, 1, 9),
         ]
         for (loaded, zone, system, month, day, hour) in rollOvers {
+            clock.calendar = calendar("Europe/Berlin", loaded)
+            clock.now = date(10, 31, 10, in: "Europe/Berlin")
             try tracker.loadInitialState()
             try tracker.stepDay(by: -1)
             clock.now = date(10, 31, 10, in: "Europe/Berlin")
