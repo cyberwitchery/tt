@@ -31,7 +31,7 @@ final class ReportBuilderTests: XCTestCase {
             end: calendar.date(from: DateComponents(year: 2024, month: 1, day: 10, hour: 12))!
         )
 
-        let totals = ReportBuilder.dailyTotals(
+        let totals = ReportBuilder.projectTotals(
             entries: [entry1, entry2, entry3, entry4],
             rangeStart: rangeStart,
             rangeEnd: rangeEnd,
@@ -48,7 +48,7 @@ final class ReportBuilderTests: XCTestCase {
         let rangeStart = Date.from(year: 2024, month: 1, day: 1)
         let rangeEnd = Date.from(year: 2024, month: 1, day: 2)
 
-        let totals = ReportBuilder.dailyTotals(
+        let totals = ReportBuilder.projectTotals(
             entries: [],
             rangeStart: rangeStart,
             rangeEnd: rangeEnd,
@@ -70,7 +70,7 @@ final class ReportBuilderTests: XCTestCase {
             end: nil
         )
 
-        let totals = ReportBuilder.dailyTotals(
+        let totals = ReportBuilder.projectTotals(
             entries: [entry],
             rangeStart: rangeStart,
             rangeEnd: rangeEnd,
@@ -99,7 +99,7 @@ final class ReportBuilderTests: XCTestCase {
             )
         ]
 
-        let totals = ReportBuilder.dailyTotals(
+        let totals = ReportBuilder.projectTotals(
             entries: entries,
             rangeStart: rangeStart,
             rangeEnd: rangeEnd,
@@ -128,7 +128,7 @@ final class ReportBuilderTests: XCTestCase {
             )
         ]
 
-        let totals = ReportBuilder.dailyTotals(
+        let totals = ReportBuilder.projectTotals(
             entries: entries,
             rangeStart: rangeStart,
             rangeEnd: rangeEnd,
@@ -150,7 +150,7 @@ final class ReportBuilderTests: XCTestCase {
             end: Date.from(year: 2024, month: 1, day: 1, hour: 10)
         )
 
-        let totals = ReportBuilder.dailyTotals(
+        let totals = ReportBuilder.projectTotals(
             entries: [entry],
             rangeStart: rangeStart,
             rangeEnd: rangeEnd,
@@ -175,7 +175,7 @@ final class ReportBuilderTests: XCTestCase {
             end: calendar.date(from: DateComponents(year: 2024, month: 1, day: 3, hour: 11))!
         )
 
-        let totals = ReportBuilder.weeklyTotals(
+        let totals = ReportBuilder.dayTotals(
             entries: [entry],
             week: DayCalendar(calendar: { calendar }).week(startingOn: weekStart),
             now: now
@@ -193,7 +193,7 @@ final class ReportBuilderTests: XCTestCase {
         let weekStart = Date.from(year: 2024, month: 1, day: 1)
         let now = Date.from(year: 2024, month: 1, day: 7)
 
-        let totals = ReportBuilder.weeklyTotals(
+        let totals = ReportBuilder.dayTotals(
             entries: [],
             week: DayCalendar(calendar: { calendar }).week(startingOn: weekStart),
             now: now
@@ -218,7 +218,7 @@ final class ReportBuilderTests: XCTestCase {
             end: nil
         )
 
-        let totals = ReportBuilder.weeklyTotals(
+        let totals = ReportBuilder.dayTotals(
             entries: [entry],
             week: DayCalendar(calendar: { calendar }).week(startingOn: weekStart),
             now: now
@@ -240,7 +240,7 @@ final class ReportBuilderTests: XCTestCase {
             end: Date.from(year: 2024, month: 1, day: 2, hour: 2)
         )
 
-        let totals = ReportBuilder.weeklyTotals(
+        let totals = ReportBuilder.dayTotals(
             entries: [entry],
             week: DayCalendar(calendar: { calendar }).week(startingOn: weekStart),
             now: now
@@ -270,7 +270,7 @@ final class ReportBuilderTests: XCTestCase {
             )
         ]
 
-        let totals = ReportBuilder.weeklyTotals(
+        let totals = ReportBuilder.dayTotals(
             entries: entries,
             week: DayCalendar(calendar: { calendar }).week(startingOn: weekStart),
             now: now
@@ -287,7 +287,7 @@ final class ReportBuilderTests: XCTestCase {
         }
         let entry = TimeEntry(projectId: "p1", start: santiago(9, 0, 30), end: santiago(9, 0, 45))
 
-        let totals = ReportBuilder.weeklyTotals(
+        let totals = ReportBuilder.dayTotals(
             entries: [entry],
             week: DayCalendar(calendar: { calendar }).week(startingOn: santiago(8, 1)),
             now: santiago(14, 12)

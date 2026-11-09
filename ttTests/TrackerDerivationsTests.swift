@@ -3,6 +3,210 @@ import GRDB
 @testable import tt
 
 final class TrackerDerivationsTests: TrackerTestCase {
+    func testCommittedTimerIsCountedEvenWhenTheFirstReportLoadFails() throws {
+        clock.now = Date.from(year: 2026, month: 1, day: 2, hour: 12)
+        let project = Project(name: "tracked")
+        let history = Project(name: "history")
+        try projectRepository.insert(project)
+        try projectRepository.insert(history)
+        try timeEntryRepository.insertRunning(entry: TimeEntry(projectId: history.id, start: clock.now - 10 * 86400, end: clock.now - 10 * 86400 + 3600))
+        let failReports = DatabaseFunction("strftime", argumentCount: 2) { _ -> String? in
+            throw DatabaseError(resultCode: .SQLITE_ERROR, message: "injected report failure")
+        }
+        try dbQueue.write { $0.add(function: failReports) }
+        XCTAssertThrowsError(try tracker.loadInitialState())
+        XCTAssertThrowsError(try tracker.startTimer())
+        clock.now = clock.now.addingTimeInterval(120)
+        XCTAssertThrowsError(try tracker.stopTimer())
+        clock.now = clock.now.addingTimeInterval(60)
+
+        XCTAssertNil(tracker.runningEntry)
+        XCTAssertEqual(tracker.todayTotalSeconds(), 120)
+        XCTAssertEqual(tracker.visibleDayTotalSeconds(), 120)
+        XCTAssertEqual(tracker.recentTotalSeconds(), 120)
+        XCTAssertEqual(tracker.projectAllTimeSeconds(for: project.id), 120)
+    }
+
+    func testKnownTimerWritesAcrossMidnightRemainClippedWhenReportsFail() throws {
+        for action in ["start", "stop"] {
+            let clock = TestClock()
+            clock.calendar = Calendar(identifier: .gregorian)
+            clock.calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+            clock.now = Date.from(year: 2026, month: 1, day: 2, hour: 23, minute: 59)
+            let database = try TestDatabase.makeInMemory()
+            let entries = TimeEntryRepository(dbQueue: database)
+            let tracker = TimeTracker(projectRepository: ProjectRepository(dbQueue: database), timeEntryRepository: entries, days: clock.days)
+            try tracker.loadInitialState()
+            let projectId = tracker.projects[0].id
+            try entries.insertRunning(entry: TimeEntry(projectId: projectId, start: clock.now - 10 * 86400, end: clock.now - 10 * 86400 + 3600))
+            try tracker.refreshReports()
+            if action == "stop" { try tracker.startTimer() }
+            let selected = tracker.selectedDay()
+            clock.now = clock.now.addingTimeInterval(120)
+            let failReports = DatabaseFunction("strftime", argumentCount: 2) { _ -> String? in
+                throw DatabaseError(resultCode: .SQLITE_ERROR, message: "injected report failure")
+            }
+            try database.write { $0.add(function: failReports) }
+            if action == "stop" { XCTAssertThrowsError(try tracker.stopTimer()) }
+            else { XCTAssertThrowsError(try tracker.startTimer()) }
+            clock.now = clock.now.addingTimeInterval(60)
+
+            XCTAssertEqual(tracker.selectedDay(), selected, action)
+            XCTAssertEqual(tracker.todayTotalSeconds(), 60, action)
+            XCTAssertEqual(tracker.visibleDayTotalSeconds(), action == "stop" ? 60 : 0, action)
+            XCTAssertEqual(tracker.recentTotalSeconds(), action == "stop" ? 120 : 60, action)
+            XCTAssertEqual(tracker.projectAllTimeSeconds(for: projectId), action == "stop" ? 3720 : 3660, action)
+        }
+    }
+
+    func testEveryRefreshPathKeepsABrowsedDateAcrossMidnight() throws {
+        for action in ["entries", "reports", "create", "archive"] {
+            let clock = TestClock()
+            clock.calendar = Calendar(identifier: .gregorian)
+            clock.calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+            clock.now = Date.from(year: 2026, month: 1, day: 2, hour: 23)
+            let database = try TestDatabase.makeInMemory()
+            let projects = ProjectRepository(dbQueue: database)
+            let entries = TimeEntryRepository(dbQueue: database)
+            let tracker = TimeTracker(projectRepository: projects, timeEntryRepository: entries, days: clock.days)
+            try tracker.loadInitialState()
+            let archive = Project(name: "archive")
+            try projects.insert(archive)
+            let start = Date.from(year: 2026, month: 1, day: 1, hour: 9)
+            let entry = TimeEntry(projectId: tracker.projects[0].id, start: start, end: start + 3600)
+            try entries.insertRunning(entry: entry)
+            try tracker.stepDay(by: -1)
+            let selected = tracker.selectedDay()
+            clock.now = Date.from(year: 2026, month: 1, day: 3, hour: 0, minute: 30)
+
+            switch action {
+            case "entries": try tracker.refreshEntries()
+            case "reports": try tracker.refreshReports()
+            case "create": try tracker.createProject(name: "new")
+            default: try tracker.archiveProject(id: archive.id)
+            }
+
+            XCTAssertEqual(tracker.selectedDay(), selected, action)
+            XCTAssertEqual(tracker.dayOffset, -2, action)
+            XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id], action)
+            XCTAssertEqual(tracker.visibleDayTotalSeconds(), 3600, action)
+            XCTAssertFalse(try tracker.rollOverIfNeeded(), action)
+        }
+    }
+
+    func testCommittedEntryChangesStayReflectedWhenReportReadsFail() throws {
+        for action in ["start", "stop", "edit", "delete"] {
+            let clock = TestClock()
+            clock.calendar = Calendar(identifier: .gregorian)
+            clock.calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+            clock.now = Date.from(year: 2026, month: 1, day: 2, hour: 12)
+            let database = try TestDatabase.makeInMemory()
+            let projects = ProjectRepository(dbQueue: database)
+            let entries = TimeEntryRepository(dbQueue: database)
+            let tracker = TimeTracker(projectRepository: projects, timeEntryRepository: entries, days: clock.days)
+            try tracker.loadInitialState()
+            let projectId = tracker.projects[0].id
+            let history = Project(name: "history")
+            try projects.insert(history)
+            try entries.insertRunning(entry: TimeEntry(projectId: history.id, start: clock.now - 10 * 86400, end: clock.now - 10 * 86400 + 3600))
+            try tracker.refreshProjects()
+            if action != "start" {
+                try tracker.startTimer()
+                clock.now = clock.now.addingTimeInterval(120)
+                try tracker.refreshEntries()
+            }
+            let running = tracker.runningEntry
+            let failReports = DatabaseFunction("strftime", argumentCount: 2) { _ -> String? in
+                throw DatabaseError(resultCode: .SQLITE_ERROR, message: "injected report failure")
+            }
+            try database.write { $0.add(function: failReports) }
+
+            switch action {
+            case "start": XCTAssertThrowsError(try tracker.startTimer())
+            case "stop": XCTAssertThrowsError(try tracker.stopTimer())
+            case "edit":
+                let entry = try XCTUnwrap(running)
+                XCTAssertThrowsError(try tracker.updateEntry(id: entry.id, start: entry.start, end: clock.now, note: "closed"))
+            default: XCTAssertThrowsError(try tracker.deleteEntry(id: XCTUnwrap(running).id))
+            }
+
+            let expected = action == "start" ? 60 : (action == "delete" ? 0 : 120)
+            if let running, action != "delete" {
+                XCTAssertEqual(try entries.get(id: running.id)?.end, clock.now, action)
+            }
+            clock.now = clock.now.addingTimeInterval(60)
+            XCTAssertEqual(tracker.todayTotalSeconds(), expected, action)
+            XCTAssertEqual(tracker.visibleDayTotalSeconds(), expected, action)
+            XCTAssertEqual(tracker.recentTotalSeconds(), expected, action)
+            XCTAssertEqual(tracker.projectTotalsForSelectedDay.reduce(0) { $0 + $1.seconds }, expected, action)
+            XCTAssertEqual(tracker.projectAllTimeSeconds(for: projectId), expected, action)
+            XCTAssertEqual(tracker.projectAllTimeSeconds(for: history.id), 3600, action)
+            if action != "start" {
+                XCTAssertNil(tracker.runningEntry, action)
+                XCTAssertTrue(tracker.visibleEntries.allSatisfy { $0.end != nil }, action)
+                XCTAssertTrue(tracker.todaysEntries.allSatisfy { $0.end != nil }, action)
+            }
+        }
+    }
+
+    func testFailedMidnightRefreshDoesNotApplyTheDayShiftAgainOnRetry() throws {
+        clock.calendar = Calendar(identifier: .gregorian)
+        clock.calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        clock.now = Date.from(year: 2026, month: 1, day: 2, hour: 23)
+        try tracker.loadInitialState()
+        let start = Date.from(year: 2026, month: 1, day: 1, hour: 9)
+        let entry = TimeEntry(projectId: tracker.projects[0].id, start: start, end: start + 3600)
+        try timeEntryRepository.insertRunning(entry: entry)
+        try tracker.stepDay(by: -1)
+        let selected = tracker.selectedDay()
+        try dbQueue.write { try $0.execute(sql: "ALTER TABLE time_entries RENAME TO unavailable_entries") }
+        clock.now = Date.from(year: 2026, month: 1, day: 3, hour: 0, minute: 30)
+
+        for _ in 0..<2 {
+            XCTAssertThrowsError(try tracker.rollOverIfNeeded())
+            XCTAssertEqual(tracker.dayOffset, -1)
+            XCTAssertEqual(tracker.selectedDay(), selected)
+            XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id])
+            XCTAssertEqual(tracker.visibleDayTotalSeconds(), 3600)
+        }
+
+        try dbQueue.write { try $0.execute(sql: "ALTER TABLE unavailable_entries RENAME TO time_entries") }
+        XCTAssertTrue(try tracker.rollOverIfNeeded())
+        XCTAssertEqual(tracker.dayOffset, -2)
+        XCTAssertEqual(tracker.selectedDay(), selected)
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id])
+        XCTAssertFalse(try tracker.rollOverIfNeeded())
+    }
+
+    func testFailedReportsDoNotPublishTheNavigationTargetEntries() throws {
+        clock.calendar = Calendar(identifier: .gregorian)
+        clock.calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        clock.now = Date.from(year: 2026, month: 1, day: 2, hour: 12)
+        try tracker.loadInitialState()
+        let today = TimeEntry(projectId: tracker.projects[0].id, start: clock.now - 3600, end: clock.now)
+        let yesterday = TimeEntry(projectId: tracker.projects[0].id, start: clock.now - 86400, end: clock.now - 86400 + 1800)
+        for entry in [today, yesterday] { try timeEntryRepository.insertRunning(entry: entry) }
+        try tracker.refreshEntries()
+        try tracker.refreshReports()
+        let selected = tracker.selectedDay()
+        let totals = tracker.projectTotalsForSelectedDay
+        let recent = tracker.recentDayTotals()
+        let failReports = DatabaseFunction("strftime", argumentCount: 2) { _ -> String? in
+            throw DatabaseError(resultCode: .SQLITE_ERROR, message: "injected report failure")
+        }
+        try dbQueue.write { $0.add(function: failReports) }
+
+        XCTAssertThrowsError(try tracker.stepDay(by: -1))
+        XCTAssertTrue(tracker.isViewingToday)
+        XCTAssertEqual(tracker.dayOffset, 0)
+        XCTAssertEqual(tracker.selectedDay(), selected)
+        XCTAssertEqual(tracker.visibleEntries.map(\.id), [today.id])
+        XCTAssertEqual(tracker.todaysEntries.map(\.id), [today.id])
+        XCTAssertEqual(tracker.visibleDayTotalSeconds(), 3600)
+        XCTAssertEqual(tracker.projectTotalsForSelectedDay, totals)
+        XCTAssertEqual(tracker.recentDayTotals(), recent)
+    }
+
     // MARK: - startedAt
 
     func testStartedAtIsNilWithNoRunningEntry() throws {
@@ -244,9 +448,9 @@ final class TrackerDerivationsTests: TrackerTestCase {
         try tracker.loadInitialState()
         let yesterday = try insert(daysAgo: 1, from: 9, to: 10)
         let today = try insert(daysAgo: 0, from: 9, to: 10)
-        tracker.refreshEntries()
+        try tracker.refreshEntries()
 
-        tracker.stepDay(by: -1)
+        try tracker.stepDay(by: -1)
 
         XCTAssertFalse(tracker.isViewingToday)
         XCTAssertEqual(tracker.selectedDay(), startOfDay(daysAgo: 1))
@@ -257,11 +461,11 @@ final class TrackerDerivationsTests: TrackerTestCase {
     func testStepDayForwardIsClampedToToday() throws {
         try tracker.loadInitialState()
 
-        tracker.stepDay(by: 1)
+        try tracker.stepDay(by: 1)
         XCTAssertEqual(tracker.dayOffset, 0)
 
-        tracker.stepDay(by: -2)
-        tracker.stepDay(by: 5)
+        try tracker.stepDay(by: -2)
+        try tracker.stepDay(by: 5)
         XCTAssertEqual(tracker.dayOffset, 0)
         XCTAssertTrue(tracker.isViewingToday)
     }
@@ -270,10 +474,10 @@ final class TrackerDerivationsTests: TrackerTestCase {
         try tracker.loadInitialState()
         try insert(daysAgo: 2, from: 9, to: 10)
         let today = try insert(daysAgo: 0, from: 9, to: 10)
-        tracker.refreshEntries()
+        try tracker.refreshEntries()
 
-        tracker.stepDay(by: -2)
-        tracker.goToToday()
+        try tracker.stepDay(by: -2)
+        try tracker.goToToday()
 
         XCTAssertTrue(tracker.isViewingToday)
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [today.id])
@@ -283,16 +487,16 @@ final class TrackerDerivationsTests: TrackerTestCase {
         try tracker.loadInitialState()
         try insert(daysAgo: 3, from: 9, to: 17)
         let today = try insert(daysAgo: 0, from: 9, to: 10)
-        tracker.refreshEntries()
+        try tracker.refreshEntries()
 
-        tracker.stepDay(by: -3)
+        try tracker.stepDay(by: -3)
 
         XCTAssertEqual(tracker.todaysEntries.map(\.id), [today.id])
     }
 
     func testStartTimerReturnsToToday() throws {
         try tracker.loadInitialState()
-        tracker.stepDay(by: -1)
+        try tracker.stepDay(by: -1)
 
         try tracker.startTimer()
 
@@ -304,7 +508,7 @@ final class TrackerDerivationsTests: TrackerTestCase {
         try tracker.loadInitialState()
         try tracker.startTimer()
         let entryId = tracker.runningEntry!.id
-        tracker.stepDay(by: -2)
+        try tracker.stepDay(by: -2)
 
         try tracker.stopTimer()
 
@@ -316,13 +520,13 @@ final class TrackerDerivationsTests: TrackerTestCase {
         try tracker.loadInitialState()
         try insert(daysAgo: 1, from: 9, to: 11)
         try insert(daysAgo: 0, from: 9, to: 10)
-        tracker.refreshReports()
+        try tracker.refreshReports()
 
-        XCTAssertEqual(tracker.dailyTotals.first?.seconds, 3600)
+        XCTAssertEqual(tracker.projectTotalsForSelectedDay.first?.seconds, 3600)
 
-        tracker.stepDay(by: -1)
+        try tracker.stepDay(by: -1)
 
-        XCTAssertEqual(tracker.dailyTotals.first?.seconds, 2 * 3600)
+        XCTAssertEqual(tracker.projectTotalsForSelectedDay.first?.seconds, 2 * 3600)
     }
 
     func testEntrySpanningMidnightIsClippedToEachDay() throws {
@@ -331,38 +535,38 @@ final class TrackerDerivationsTests: TrackerTestCase {
         let end = time(daysAgo: 0, hour: 1)
         let entry = TimeEntry(projectId: tracker.projects[0].id, start: start, end: end)
         try timeEntryRepository.insertRunning(entry: entry)
-        tracker.refreshEntries()
-        tracker.refreshReports()
+        try tracker.refreshEntries()
+        try tracker.refreshReports()
 
         let midnight = startOfDay(daysAgo: 0)
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id])
-        XCTAssertEqual(tracker.dailyTotals.first?.seconds, Int(end.timeIntervalSince(midnight)))
+        XCTAssertEqual(tracker.projectTotalsForSelectedDay.first?.seconds, Int(end.timeIntervalSince(midnight)))
 
-        tracker.stepDay(by: -1)
+        try tracker.stepDay(by: -1)
 
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id])
-        XCTAssertEqual(tracker.dailyTotals.first?.seconds, Int(midnight.timeIntervalSince(start)))
+        XCTAssertEqual(tracker.projectTotalsForSelectedDay.first?.seconds, Int(midnight.timeIntervalSince(start)))
     }
 
     func testDeleteEntryOnAPastDayKeepsThatDaySelected() throws {
         try tracker.loadInitialState()
         let kept = try insert(daysAgo: 1, from: 9, to: 10)
         let removed = try insert(daysAgo: 1, from: 11, to: 12)
-        tracker.refreshEntries()
-        tracker.stepDay(by: -1)
+        try tracker.refreshEntries()
+        try tracker.stepDay(by: -1)
 
         try tracker.deleteEntry(id: removed.id)
 
         XCTAssertFalse(tracker.isViewingToday)
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [kept.id])
-        XCTAssertEqual(tracker.dailyTotals.first?.seconds, 3600)
+        XCTAssertEqual(tracker.projectTotalsForSelectedDay.first?.seconds, 3600)
     }
 
     func testEditingAPastEntryLeavesItOnItsOwnDay() throws {
         try tracker.loadInitialState()
         let entry = try insert(daysAgo: 1, from: 9, to: 10)
-        tracker.refreshEntries()
-        tracker.stepDay(by: -1)
+        try tracker.refreshEntries()
+        try tracker.stepDay(by: -1)
 
         let editor = EntryEditor(days: clock.days)
         let fields = editor.withEnd(
@@ -374,7 +578,7 @@ final class TrackerDerivationsTests: TrackerTestCase {
         XCTAssertFalse(tracker.isViewingToday)
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id])
         XCTAssertEqual(tracker.visibleEntries.first?.note, "fixed")
-        XCTAssertEqual(tracker.dailyTotals.first?.seconds, 2 * 3600)
+        XCTAssertEqual(tracker.projectTotalsForSelectedDay.first?.seconds, 2 * 3600)
         XCTAssertTrue(tracker.todaysEntries.isEmpty)
     }
 
@@ -382,11 +586,11 @@ final class TrackerDerivationsTests: TrackerTestCase {
         try tracker.loadInitialState()
         let entry = TimeEntry(projectId: tracker.projects[0].id, start: time(daysAgo: 1, hour: 23))
         try timeEntryRepository.insertRunning(entry: entry)
-        tracker.refreshEntries()
+        try tracker.refreshEntries()
 
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id])
 
-        tracker.stepDay(by: -1)
+        try tracker.stepDay(by: -1)
 
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [entry.id])
     }
@@ -404,12 +608,12 @@ final class TrackerDerivationsTests: TrackerTestCase {
     func testVisibleDayTotalClipsAnEntrySpanningMidnightToTheSelectedDay() throws {
         try tracker.loadInitialState()
         let (start, end) = try insertSpanningMidnight()
-        tracker.refreshEntries()
+        try tracker.refreshEntries()
 
         let midnight = startOfDay(daysAgo: 0)
         XCTAssertEqual(tracker.visibleDayTotalSeconds(), Int(end.timeIntervalSince(midnight)))
 
-        tracker.stepDay(by: -1)
+        try tracker.stepDay(by: -1)
 
         XCTAssertEqual(tracker.visibleDayTotalSeconds(), Int(midnight.timeIntervalSince(start)))
     }
@@ -417,7 +621,7 @@ final class TrackerDerivationsTests: TrackerTestCase {
     func testTodayTotalClipsAnEntrySpanningMidnightToToday() throws {
         try tracker.loadInitialState()
         let (_, end) = try insertSpanningMidnight()
-        tracker.refreshEntries()
+        try tracker.refreshEntries()
 
         XCTAssertEqual(tracker.todayTotalSeconds(), Int(end.timeIntervalSince(startOfDay(daysAgo: 0))))
     }
@@ -426,12 +630,12 @@ final class TrackerDerivationsTests: TrackerTestCase {
         try tracker.loadInitialState()
         try insert(daysAgo: 1, from: 9, to: 12)
         try insert(daysAgo: 0, from: 9, to: 10)
-        tracker.refreshEntries()
+        try tracker.refreshEntries()
 
         XCTAssertEqual(tracker.todayTotalSeconds(), 3600)
         XCTAssertEqual(tracker.visibleDayTotalSeconds(), 3600)
 
-        tracker.stepDay(by: -1)
+        try tracker.stepDay(by: -1)
 
         XCTAssertEqual(tracker.todayTotalSeconds(), 3600)
         XCTAssertEqual(tracker.visibleDayTotalSeconds(), 3 * 3600)
@@ -443,11 +647,11 @@ final class TrackerDerivationsTests: TrackerTestCase {
         try tracker.loadInitialState()
         try insert(daysAgo: 1, from: 9, to: 10)
         clock.now = time(daysAgo: 1, hour: 23)
-        tracker.refreshEntries()
+        try tracker.refreshEntries()
         XCTAssertEqual(tracker.visibleEntries.count, 1)
 
         clock.now = time(daysAgo: 0, hour: 0, minute: 30)
-        XCTAssertTrue(tracker.rollOverIfNeeded())
+        XCTAssertTrue(try tracker.rollOverIfNeeded())
 
         XCTAssertTrue(tracker.isViewingToday)
         XCTAssertEqual(tracker.selectedDay(), startOfDay(daysAgo: 0))
@@ -456,15 +660,16 @@ final class TrackerDerivationsTests: TrackerTestCase {
     }
 
     func testRollOverHoldsABrowsedDayOnItsOwnDate() throws {
+        clock.now = time(daysAgo: 1, hour: 23)
         try tracker.loadInitialState()
         let older = try insert(daysAgo: 2, from: 9, to: 10)
-        tracker.stepDay(by: -1)
+        try tracker.stepDay(by: -1)
         clock.now = time(daysAgo: 1, hour: 23)
-        tracker.refreshEntries()
+        try tracker.refreshEntries()
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [older.id])
 
         clock.now = time(daysAgo: 0, hour: 0, minute: 30)
-        XCTAssertTrue(tracker.rollOverIfNeeded())
+        XCTAssertTrue(try tracker.rollOverIfNeeded())
 
         XCTAssertEqual(tracker.dayOffset, -2)
         XCTAssertEqual(tracker.selectedDay(), startOfDay(daysAgo: 2))
@@ -472,23 +677,25 @@ final class TrackerDerivationsTests: TrackerTestCase {
     }
 
     func testRollOverOutOfADayWithoutAMidnightHoldsABrowsedDayOnItsOwnDate() throws {
-        try tracker.loadInitialState()
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "America/Santiago")!
         func santiago(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
             calendar.date(from: DateComponents(year: 2024, month: 9, day: day, hour: hour, minute: minute))!
         }
+        clock.calendar = calendar
+        clock.now = santiago(8, 23)
+        try tracker.loadInitialState()
         let older = TimeEntry(projectId: tracker.projects[0].id, start: santiago(7, 9), end: santiago(7, 10))
         try timeEntryRepository.insertRunning(entry: older)
-        tracker.stepDay(by: -1)
+        try tracker.stepDay(by: -1)
         clock.now = santiago(8, 23)
         clock.calendar = calendar
-        tracker.refreshEntries()
+        try tracker.refreshEntries()
         XCTAssertEqual(tracker.visibleEntries.map(\.id), [older.id])
 
         let now = santiago(9, 0, 30)
         clock.now = now
-        XCTAssertTrue(tracker.rollOverIfNeeded())
+        XCTAssertTrue(try tracker.rollOverIfNeeded())
 
         XCTAssertEqual(tracker.dayOffset, -2)
         XCTAssertEqual(tracker.selectedDay(), santiago(7, 0))
@@ -510,17 +717,19 @@ final class TrackerDerivationsTests: TrackerTestCase {
             (.buddhist, "Europe/Berlin", .islamicCivil, 11, 1, 9),
         ]
         for (loaded, zone, system, month, day, hour) in rollOvers {
+            clock.calendar = calendar("Europe/Berlin", loaded)
+            clock.now = date(10, 31, 10, in: "Europe/Berlin")
             try tracker.loadInitialState()
-            tracker.stepDay(by: -1)
+            try tracker.stepDay(by: -1)
             clock.now = date(10, 31, 10, in: "Europe/Berlin")
             clock.calendar = calendar("Europe/Berlin", loaded)
-            tracker.refreshEntries()
+            try tracker.refreshEntries()
 
             let moved = calendar(zone, system)
             let now = date(month, day, hour, in: zone)
             clock.now = now
             clock.calendar = moved
-            XCTAssertTrue(tracker.rollOverIfNeeded(), zone)
+            XCTAssertTrue(try tracker.rollOverIfNeeded(), zone)
 
             XCTAssertEqual(tracker.selectedDay(), date(10, 30, 0, in: zone), zone)
         }
@@ -528,13 +737,13 @@ final class TrackerDerivationsTests: TrackerTestCase {
 
     func testRollOverDoesNothingUntilTheDayActuallyChanges() throws {
         clock.now = time(daysAgo: 0, hour: 9)
-        XCTAssertFalse(tracker.rollOverIfNeeded())
+        XCTAssertFalse(try tracker.rollOverIfNeeded())
 
         try tracker.loadInitialState()
         clock.now = time(daysAgo: 0, hour: 9)
-        tracker.refreshEntries()
+        try tracker.refreshEntries()
 
         clock.now = time(daysAgo: 0, hour: 23)
-        XCTAssertFalse(tracker.rollOverIfNeeded())
+        XCTAssertFalse(try tracker.rollOverIfNeeded())
     }
 }

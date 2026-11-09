@@ -23,8 +23,8 @@ final class TimeTrackerTests: TrackerTestCase {
 
         XCTAssertEqual(tracker.selectedDay(), Date.from(year: 2026, month: 1, day: 1, hour: 10))
         XCTAssertEqual(tracker.todaysEntries.map(\.id), [entry.id])
-        XCTAssertEqual(tracker.dailyTotals.map(\.seconds), [3600])
-        XCTAssertEqual(tracker.weeklyTotals().last?.seconds, 3600)
+        XCTAssertEqual(tracker.projectTotalsForSelectedDay.map(\.seconds), [3600])
+        XCTAssertEqual(tracker.recentDayTotals().last?.seconds, 3600)
     }
 
     func testTimerUsesTheInjectedClockForStartAndStop() throws {
@@ -151,7 +151,7 @@ final class TimeTrackerTests: TrackerTestCase {
         try tracker.loadInitialState()
         let newProject = Project(name: "new")
         try projectRepository.insert(newProject)
-        tracker.refreshProjects(keepSelection: true)
+        try tracker.refreshProjects()
 
         tracker.selectProject(id: newProject.id)
 
@@ -180,7 +180,7 @@ final class TimeTrackerTests: TrackerTestCase {
         let projectId = tracker.projects[0].id
         let newProject = Project(name: "keeper")
         try projectRepository.insert(newProject)
-        tracker.refreshProjects(keepSelection: true)
+        try tracker.refreshProjects()
 
         try tracker.archiveProject(id: projectId)
 
@@ -193,12 +193,23 @@ final class TimeTrackerTests: TrackerTestCase {
         let projectToArchive = tracker.projects[0].id
         let newProject = Project(name: "next")
         try projectRepository.insert(newProject)
-        tracker.refreshProjects(keepSelection: true)
+        try tracker.refreshProjects()
         tracker.selectProject(id: projectToArchive)
 
         try tracker.archiveProject(id: projectToArchive)
 
         XCTAssertEqual(tracker.selectedProjectId, newProject.id)
+    }
+
+    func testArchivingAnotherProjectKeepsTheSelectedProject() throws {
+        try tracker.loadInitialState()
+        try tracker.createProject(name: "selected")
+        try tracker.createProject(name: "archived")
+        let selected = try XCTUnwrap(tracker.projects.first { $0.name == "selected" })
+        let archived = try XCTUnwrap(tracker.projects.first { $0.name == "archived" })
+        tracker.selectProject(id: selected.id)
+        try tracker.archiveProject(id: archived.id)
+        XCTAssertEqual(tracker.selectedProjectId, selected.id)
     }
 
     func testProjectName() throws {
@@ -222,7 +233,7 @@ final class TimeTrackerTests: TrackerTestCase {
         try tracker.loadInitialState()
         let project = Project(name: "client")
         try projectRepository.insert(project)
-        tracker.refreshProjects(keepSelection: true)
+        try tracker.refreshProjects()
         let start = Date.from(year: 2024, month: 6, day: 15, hour: 9)
         try timeEntryRepository.insertRunning(
             entry: TimeEntry(projectId: project.id, start: start, end: start.addingTimeInterval(3600))
@@ -233,10 +244,10 @@ final class TimeTrackerTests: TrackerTestCase {
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         clock.now = start.addingTimeInterval(7200)
         clock.calendar = calendar
-        tracker.refreshReports()
+        try tracker.refreshReports()
 
         XCTAssertEqual(tracker.projectName(for: project.id), "client")
-        XCTAssertEqual(tracker.dailyTotals.map(\.name), ["client"])
+        XCTAssertEqual(tracker.projectTotalsForSelectedDay.map(\.name), ["client"])
     }
 
     // MARK: - Entry Management
@@ -251,7 +262,7 @@ final class TimeTrackerTests: TrackerTestCase {
 
         try tracker.updateEntry(id: entryId, start: newStart, end: newEnd, note: "updated")
 
-        let entry = try tracker.getEntry(id: entryId)
+        let entry = try timeEntryRepository.get(id: entryId)
         XCTAssertEqual(entry?.id, entryId)
         XCTAssertEqual(entry?.start, newStart)
         XCTAssertEqual(entry?.end, newEnd)
@@ -268,7 +279,7 @@ final class TimeTrackerTests: TrackerTestCase {
 
         try tracker.updateEntry(id: entryId, start: start, end: endBeforeStart, note: nil)
 
-        let entry = try tracker.getEntry(id: entryId)
+        let entry = try timeEntryRepository.get(id: entryId)
         XCTAssertEqual(entry?.end, start)
     }
 
@@ -325,10 +336,10 @@ final class TimeTrackerTests: TrackerTestCase {
         let now = start.addingTimeInterval(42)
         clock.now = now
         clock.calendar = calendar
-        tracker.refreshReports()
+        try tracker.refreshReports()
 
-        XCTAssertEqual(tracker.dailyTotals.count, 1)
-        XCTAssertEqual(tracker.dailyTotals[0].seconds, 42)
+        XCTAssertEqual(tracker.projectTotalsForSelectedDay.count, 1)
+        XCTAssertEqual(tracker.projectTotalsForSelectedDay[0].seconds, 42)
     }
 
     func testWeeklyTotalsAfterWork() throws {
@@ -347,9 +358,9 @@ final class TimeTrackerTests: TrackerTestCase {
 
         clock.now = now
         clock.calendar = calendar
-        tracker.refreshReports()
+        try tracker.refreshReports()
 
-        let totalSeconds = tracker.weeklyTotals().reduce(0) { $0 + $1.seconds }
+        let totalSeconds = tracker.recentDayTotals().reduce(0) { $0 + $1.seconds }
         XCTAssertEqual(totalSeconds, 2 * 3600)
     }
 
@@ -366,9 +377,9 @@ final class TimeTrackerTests: TrackerTestCase {
         let now = santiago(8, 12)
         clock.now = now
         clock.calendar = calendar
-        tracker.refreshReports()
+        try tracker.refreshReports()
 
-        XCTAssertEqual(tracker.weeklyTotals().first?.seconds, 15 * 60)
+        XCTAssertEqual(tracker.recentDayTotals().first?.seconds, 15 * 60)
     }
 
     func testWeeklyTotalsCountARunningTimerUpToEachRead() throws {
@@ -390,12 +401,12 @@ final class TimeTrackerTests: TrackerTestCase {
             try timeEntryRepository.insertRunning(entry: entry)
             clock.now = refreshed
             clock.calendar = calendar
-            tracker.refreshReports()
+            try tracker.refreshReports()
 
             clock.now = read
-            XCTAssertEqual(tracker.weeklyTotals().map(\.seconds), days, "\(start)")
+            XCTAssertEqual(tracker.recentDayTotals().map(\.seconds), days, "\(start)")
             clock.now = read.addingTimeInterval(3600)
-            let hourLater = tracker.weeklyTotals()
+            let hourLater = tracker.recentDayTotals()
             XCTAssertEqual(hourLater.map(\.seconds).reduce(0, +), days.reduce(0, +) + hour, "\(start)")
 
             try timeEntryRepository.delete(id: entry.id)

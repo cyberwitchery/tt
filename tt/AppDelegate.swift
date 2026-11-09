@@ -194,3 +194,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 }
+
+extension Notification.Name {
+    static let ttShowMainWindow = Notification.Name("tt.showMainWindow")
+    static let ttHidePanel = Notification.Name("tt.hidePanel")
+    static let ttRequestQuit = Notification.Name("tt.requestQuit")
+}

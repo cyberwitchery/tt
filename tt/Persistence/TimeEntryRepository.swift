@@ -8,19 +8,21 @@ final class TimeEntryRepository {
         self.dbQueue = dbQueue
     }
 
-    func insertRunning(entry: TimeEntry) throws {
+    @discardableResult
+    func insertRunning(entry: TimeEntry) throws -> TimeEntry {
         try dbQueue.write { db in
             try entry.insert(db)
+            return try TimeEntry.find(db, key: entry.id)
         }
     }
 
     func stopRunning(entry: TimeEntry, end: Date) throws -> TimeEntry {
         var updated = entry
         updated.end = end
-        try dbQueue.write { db in
+        return try dbQueue.write { db in
             try updated.update(db)
+            return try TimeEntry.find(db, key: updated.id)
         }
-        return updated
     }
 
     func get(id: String) throws -> TimeEntry? {
@@ -31,9 +33,11 @@ final class TimeEntryRepository {
         }
     }
 
-    func update(_ entry: TimeEntry) throws {
+    @discardableResult
+    func update(_ entry: TimeEntry) throws -> TimeEntry {
         try dbQueue.write { db in
             try entry.update(db)
+            return try TimeEntry.find(db, key: entry.id)
         }
     }
 
@@ -63,14 +67,6 @@ final class TimeEntryRepository {
 
     func fetchEntries(on day: DayCalendar.Day) throws -> [TimeEntry] {
         try fetchEntries(in: day.range)
-    }
-
-    func fetchAll() throws -> [TimeEntry] {
-        try dbQueue.read { db in
-            try TimeEntry
-                .order(Column("start").desc)
-                .fetchAll(db)
-        }
     }
 
     func fetchCompletedTotalsByProject() throws -> [String: Int] {
