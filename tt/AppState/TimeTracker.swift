@@ -9,16 +9,26 @@ final class TimeTracker: ObservableObject {
     @Published private(set) var projects: [Project] = []
     private var allProjectNames: [String: String] = [:]
     @Published private(set) var runningEntry: TimeEntry?
-    @Published private(set) var todaysEntries: [TimeEntry] = []
-    @Published private(set) var visibleEntries: [TimeEntry] = []
-    /// days back from today. 0 is today.
-    @Published private(set) var dayOffset: Int = 0
-    @Published private(set) var projectTotalsForSelectedDay: [ProjectTotal] = []
-    private var weekEntries: [TimeEntry] = []
-    @Published private(set) var projectCompletedTotals: [String: Int] = [:]
-    @Published private(set) var lastEntryEnd: Date?
-    /// the "today" the loaded entry list was fetched against.
-    private var loadedDay: DayCalendar.Day?
+    private struct LoadedState {
+        let today: DayCalendar.Day
+        let selection: DayCalendar.Day
+        let offset: Int
+        let todaysEntries: [TimeEntry]
+        let visibleEntries: [TimeEntry]
+        let projectTotals: [ProjectTotal]
+        let recentEntries: [TimeEntry]
+        let completedTotals: [String: Int]
+        let lastEntryEnd: Date?
+    }
+
+    @Published private var loaded: LoadedState?
+    var todaysEntries: [TimeEntry] { loaded?.todaysEntries ?? [] }
+    var visibleEntries: [TimeEntry] { loaded?.visibleEntries ?? [] }
+    /// Offset from the day of the last successful load, committed with its entries.
+    var dayOffset: Int { loaded?.offset ?? 0 }
+    var projectTotalsForSelectedDay: [ProjectTotal] { loaded?.projectTotals ?? [] }
+    var projectCompletedTotals: [String: Int] { loaded?.completedTotals ?? [:] }
+    var lastEntryEnd: Date? { loaded?.lastEntryEnd }
     @Published var selectedProjectId: String?
 
     var startedAt: Date? { runningEntry?.start }
@@ -31,32 +41,27 @@ final class TimeTracker: ObservableObject {
 
     /// the day the entry list and `projectTotalsForSelectedDay` describe.
     func selectedDay() -> Date {
-        selectedDay(at: days.now).start
+        loaded?.selection.start ?? days.today.start
     }
 
-    private func selectedDay(at now: Date) -> DayCalendar.Day {
-        days.day(byAdding: dayOffset, to: days.day(containing: now))
+    private func offsetForReload(at now: Date) -> Int {
+        guard let loaded, loaded.offset != 0 else { return 0 }
+        return min(0, loaded.offset - days.daysBetween(loaded.today, and: days.day(containing: now)))
     }
 
-    var isViewingToday: Bool { dayOffset == 0 }
+    var isViewingToday: Bool { selectedDay() == days.today.start }
 
     /// step the selection by `days`, never past today.
     func stepDay(by offset: Int) throws {
-        let target = min(0, dayOffset + offset)
-        guard target != dayOffset else { return }
-        try browse(to: target)
+        let now = days.now
+        let target = min(0, offsetForReload(at: now) + offset)
+        guard target != dayOffset || loaded?.today != days.day(containing: now) else { return }
+        try reload(at: now, offset: target)
     }
 
     func goToToday() throws {
-        guard dayOffset != 0 else { return }
-        try browse(to: 0)
-    }
-
-    private func browse(to offset: Int) throws {
-        let previous = dayOffset
-        dayOffset = offset
-        do { try reload(at: days.now) }
-        catch { dayOffset = previous; throw error }
+        guard !isViewingToday else { return }
+        try reload(at: days.now, offset: 0)
     }
 
     /// seconds tracked on the selected day, clipped to it.
@@ -64,7 +69,7 @@ final class TimeTracker: ObservableObject {
         let now = days.now
         return ReportBuilder.dayTotalSeconds(
             entries: visibleEntries,
-            day: selectedDay(at: now),
+            day: loaded?.selection ?? days.day(containing: now),
             now: now
         )
     }
@@ -79,7 +84,7 @@ final class TimeTracker: ObservableObject {
     func recentDayTotals() -> [DayTotal] {
         let now = days.now
         return ReportBuilder.dayTotals(
-            entries: weekEntries,
+            entries: loaded?.recentEntries ?? [],
             week: days.week(endingOn: now),
             now: now
         )
@@ -93,16 +98,10 @@ final class TimeTracker: ObservableObject {
     /// browsed day on its own date. true if it reloaded.
     @discardableResult
     func rollOverIfNeeded() throws -> Bool {
-        guard let loadedDay else { return false }
+        guard let loaded else { return false }
         let now = days.now
-        let today = days.day(containing: now)
-        guard today != loadedDay else { return false }
-
-        if !isViewingToday {
-            let crossed = days.daysBetween(loadedDay, and: today)
-            dayOffset = min(0, dayOffset - crossed)
-        }
-        try reload(at: now)
+        guard days.day(containing: now) != loaded.today else { return false }
+        try reload(at: now, offset: offsetForReload(at: now))
         return true
     }
 
@@ -124,12 +123,7 @@ final class TimeTracker: ObservableObject {
         try loadProjects()
         selectedProjectId = defaultProject.id
         runningEntry = try timeEntryRepository.fetchRunning()
-        dayOffset = 0
-        let now = days.now
-        loadedDay = days.day(containing: now)
-        todaysEntries = try timeEntryRepository.fetchEntries(on: days.day(containing: now))
-        visibleEntries = todaysEntries
-        try refreshReports(at: now)
+        try reload(at: days.now, offset: 0)
     }
 
     // MARK: - Timer Control
@@ -142,8 +136,7 @@ final class TimeTracker: ObservableObject {
         let entry = TimeEntry(projectId: projectId, start: now)
         try timeEntryRepository.insertRunning(entry: entry)
         runningEntry = entry
-        dayOffset = 0
-        try reload(at: now)
+        try reload(at: now, offset: 0)
     }
 
     func stopTimer() throws {
@@ -151,8 +144,7 @@ final class TimeTracker: ObservableObject {
         let now = days.now
         _ = try timeEntryRepository.stopRunning(entry: entry, end: now)
         runningEntry = nil
-        dayOffset = 0
-        try reload(at: now)
+        try reload(at: now, offset: 0)
     }
 
     var isRunning: Bool {
@@ -203,13 +195,15 @@ final class TimeTracker: ObservableObject {
         try timeEntryRepository.update(entry)
         try timeEntryRepository.resolveMultipleRunningEntries()
         runningEntry = try timeEntryRepository.fetchRunning()
-        try reload(at: days.now)
+        let now = days.now
+        try reload(at: now, offset: offsetForReload(at: now))
     }
 
     func deleteEntry(id: String) throws {
         try timeEntryRepository.delete(id: id)
         runningEntry = try timeEntryRepository.fetchRunning()
-        try reload(at: days.now)
+        let now = days.now
+        try reload(at: now, offset: offsetForReload(at: now))
     }
 
     // MARK: - Refresh
@@ -230,39 +224,29 @@ final class TimeTracker: ObservableObject {
     }
 
     func refreshEntries() throws {
-        try refreshEntries(at: days.now)
-    }
-
-    private func refreshEntries(at now: Date) throws {
-        let today = try timeEntryRepository.fetchEntries(on: days.day(containing: now))
-        let visible = isViewingToday ? today : try timeEntryRepository.fetchEntries(on: selectedDay(at: now))
-        loadedDay = days.day(containing: now)
-        todaysEntries = today
-        visibleEntries = visible
+        try reload(at: days.now, offset: dayOffset)
     }
 
     func refreshReports() throws {
-        try refreshReports(at: days.now)
+        try reload(at: days.now, offset: dayOffset)
     }
 
-    private func reload(at now: Date) throws {
-        try refreshEntries(at: now)
-        try refreshReports(at: now)
-    }
-
-    private func refreshReports(at now: Date) throws {
-        let day = selectedDay(at: now).range
-        let dailyEntries = try timeEntryRepository.fetchEntries(in: day)
-        let recentEntries = try timeEntryRepository.fetchEntries(in: days.week(endingOn: now).range)
+    private func reload(at now: Date, offset: Int) throws {
+        // Finish every read before publishing selection, entries or totals.
+        let today = days.day(containing: now)
+        let selection = days.day(byAdding: offset, to: today)
+        let todayEntries = try timeEntryRepository.fetchEntries(on: today)
+        let visible = offset == 0 ? todayEntries : try timeEntryRepository.fetchEntries(on: selection)
+        let recent = try timeEntryRepository.fetchEntries(in: days.week(endingOn: now).range)
         let completed = try timeEntryRepository.fetchCompletedTotalsByProject()
         let last = try timeEntryRepository.fetchMostRecentlyEnded()?.end
-        projectTotalsForSelectedDay = ReportBuilder.projectTotals(
-            entries: dailyEntries, rangeStart: day.lowerBound, rangeEnd: day.upperBound, now: now,
+        let totals = ReportBuilder.projectTotals(
+            entries: visible, rangeStart: selection.start, rangeEnd: selection.end, now: now,
             projectNameForId: { self.projectName(for: $0) }
         )
-        weekEntries = recentEntries
-        projectCompletedTotals = completed
-        lastEntryEnd = last
+        loaded = LoadedState(today: today, selection: selection, offset: offset, todaysEntries: todayEntries,
+                             visibleEntries: visible, projectTotals: totals, recentEntries: recent,
+                             completedTotals: completed, lastEntryEnd: last)
     }
 
     func projectAllTimeSeconds(for projectId: String) -> Int {
