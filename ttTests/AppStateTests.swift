@@ -16,7 +16,7 @@ final class AppStateTests: XCTestCase {
     }
 
     @MainActor
-    func testBootstrapSurfacesTheDatabaseOpenFailure() {
+    func testBootstrapSurfacesTheDatabaseOpenFailure() throws {
         let error = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "database unavailable"])
         let state = AppState(database: .failure(error))
         XCTAssertNotNil(state.lastError)
@@ -64,6 +64,49 @@ final class AppStateErrorTests: XCTestCase {
             timeEntryRepository: entryRepo
         )
         return AppState(tracker: tracker)
+    }
+
+    @MainActor
+    func testEntryReadFailureShowsAnErrorAndRetainsTheLastEntries() {
+        let state = makeAppState()
+        state.loadInitialState()
+        state.startTimer()
+        let entries = state.visibleEntries
+        dropTable("time_entries")
+        state.refreshEntries()
+        XCTAssertNotNil(state.lastError)
+        XCTAssertEqual(state.visibleEntries, entries)
+        state.stepDay(by: -1)
+        XCTAssertTrue(state.isViewingToday)
+        XCTAssertEqual(state.visibleEntries, entries)
+    }
+
+    @MainActor
+    func testProjectReadFailureRetainsAValidSelection() {
+        let state = makeAppState()
+        state.loadInitialState()
+        let projects = state.projects
+        let selection = state.selectedProjectId
+        dropTable("projects")
+        state.refreshProjects()
+        XCTAssertNotNil(state.lastError)
+        XCTAssertEqual(state.projects, projects)
+        XCTAssertEqual(state.selectedProjectId, selection)
+        XCTAssertTrue(state.projects.contains { $0.id == selection })
+    }
+
+    @MainActor
+    func testReportReadFailureRetainsTheLastTotals() {
+        let state = makeAppState()
+        state.loadInitialState()
+        state.startTimer()
+        state.stopTimer()
+        state.refreshReports()
+        let totals = state.projectTotalsForSelectedDay
+        dropTable("time_entries")
+        state.refreshReports()
+        XCTAssertNotNil(state.lastError)
+        XCTAssertEqual(state.projectTotalsForSelectedDay, totals)
     }
 
     func testLoadInitialStateSurfacesError() async {
@@ -289,7 +332,7 @@ final class AppStateDayBrowsingTests: XCTestCase {
         )
         try entryRepository.insertRunning(entry: today)
         clock.now = time(daysAgo: 1, hour: 23)
-        tracker.refreshEntries()
+        try tracker.refreshEntries()
         XCTAssertEqual(appState.visibleEntries.count, 1)
 
         clock.now = time(daysAgo: 0, hour: 0, minute: 30)

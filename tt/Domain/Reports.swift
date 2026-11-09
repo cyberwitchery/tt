@@ -53,7 +53,7 @@ enum ReportBuilder {
         )
     }
 
-    static func dailyTotals(
+    static func projectTotals(
         entries: [TimeEntry],
         rangeStart: Date,
         rangeEnd: Date,
@@ -76,7 +76,7 @@ enum ReportBuilder {
     }
 
     /// totals clipped to each of the week's calendar days.
-    static func weeklyTotals(
+    static func dayTotals(
         entries: [TimeEntry],
         week: DayCalendar.Week,
         now: Date

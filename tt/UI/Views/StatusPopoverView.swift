@@ -4,12 +4,6 @@ struct StatusPopoverView: View {
     @ObservedObject var appState: AppState
     @State private var pickerOpen = false
 
-    private static let timeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm"
-        return f
-    }()
-
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
@@ -56,10 +50,7 @@ struct StatusPopoverView: View {
     private var projectRow: some View {
         HStack(spacing: 6) {
             Text("project")
-                .font(BrutalistTheme.metaFont)
-                .foregroundColor(BrutalistTheme.dim)
-                .textCase(.uppercase)
-                .kerning(1.3)
+                .trackerLabel(font: BrutalistTheme.metaFont, color: BrutalistTheme.dim, kerning: 1.3)
             HeaderProjectPicker(
                 projects: appState.projects,
                 selectedId: Binding(
@@ -72,18 +63,15 @@ struct StatusPopoverView: View {
             )
             Spacer()
             if let started = appState.startedAt {
-                Text("started \(Self.timeFormatter.string(from: started))")
-                    .font(BrutalistTheme.metaFont)
-                    .foregroundColor(BrutalistTheme.dim)
-                    .textCase(.uppercase)
-                    .kerning(1.1)
+                Text("started \(TrackerText.date(started, label: .time, days: appState.days))")
+                    .trackerLabel(font: BrutalistTheme.metaFont, color: BrutalistTheme.dim, kerning: 1.1)
             }
         }
     }
 
     private var timerRow: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(colorizeTimer(HMS.hoursMinutesSeconds(appState.elapsedSeconds)))
+            Text(TrackerText.timer(seconds: appState.elapsedSeconds))
                 .font(BrutalistTheme.timerPopoverFont)
                 .kerning(-0.2)
                 .monospacedDigit()
@@ -101,22 +89,16 @@ struct StatusPopoverView: View {
         HStack(spacing: 16) {
             HStack(spacing: 6) {
                 Text("today")
-                    .font(BrutalistTheme.metaFont)
-                    .foregroundColor(BrutalistTheme.dim)
-                    .textCase(.uppercase)
-                    .kerning(1.1)
-                Text(HMS.hoursMinutes(appState.todayTotalSeconds()))
+                    .trackerLabel(font: BrutalistTheme.metaFont, color: BrutalistTheme.dim, kerning: 1.1)
+                Text(TimeMath.formatHM(seconds: appState.todayTotalSeconds()))
                     .font(BrutalistTheme.metaFont)
                     .foregroundColor(BrutalistTheme.fg)
                     .monospacedDigit()
             }
             HStack(spacing: 6) {
-                Text("week")
-                    .font(BrutalistTheme.metaFont)
-                    .foregroundColor(BrutalistTheme.dim)
-                    .textCase(.uppercase)
-                    .kerning(1.1)
-                Text(HMS.hoursMinutes(weekSeconds()))
+                Text("last 7d")
+                    .trackerLabel(font: BrutalistTheme.metaFont, color: BrutalistTheme.dim, kerning: 1.1)
+                Text(TimeMath.formatHM(seconds: appState.recentTotalSeconds()))
                     .font(BrutalistTheme.metaFont)
                     .foregroundColor(BrutalistTheme.fg)
                     .monospacedDigit()
@@ -125,18 +107,4 @@ struct StatusPopoverView: View {
         }
     }
 
-    private func weekSeconds() -> Int {
-        appState.weeklyTotals().reduce(0) { $0 + $1.seconds }
-    }
-
-    private func colorizeTimer(_ text: String) -> AttributedString {
-        var attr = AttributedString(text)
-        attr.foregroundColor = BrutalistTheme.fg
-        var search = attr.startIndex
-        while let range = attr[search...].range(of: ":") {
-            attr[range].foregroundColor = BrutalistTheme.colonDim
-            search = range.upperBound
-        }
-        return attr
-    }
 }

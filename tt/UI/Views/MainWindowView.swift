@@ -30,25 +30,6 @@ struct MainWindowView: View {
     // keyboard flow: after user picks a project via the N shortcut, start timer.
     @State private var startAfterProjectPick = false
 
-    // week day labels (localized short)
-    private static let dayFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "EE"
-        return f
-    }()
-
-    private static let dayLabelFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "EE dd.MM"
-        return f
-    }()
-
-    private static let timeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm"
-        return f
-    }()
-
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
@@ -169,17 +150,11 @@ struct MainWindowView: View {
     private var metaText: some View {
         HStack(spacing: 6) {
             if let started = appState.startedAt {
-                Text("started \(Self.timeFormatter.string(from: started))")
-                    .font(BrutalistTheme.metaFont)
-                    .foregroundColor(BrutalistTheme.dim)
-                    .textCase(.uppercase)
-                    .kerning(1.3)
+                Text("started \(TrackerText.date(started, label: .time, days: appState.days))")
+                    .trackerLabel(font: BrutalistTheme.metaFont, color: BrutalistTheme.dim, kerning: 1.3)
             } else if let idle = appState.idleSeconds {
-                Text("idle \(HMS.idleHours(idle))")
-                    .font(BrutalistTheme.metaFont)
-                    .foregroundColor(BrutalistTheme.dim)
-                    .textCase(.uppercase)
-                    .kerning(1.3)
+                Text("idle \(TimeMath.formatIdle(seconds: idle))")
+                    .trackerLabel(font: BrutalistTheme.metaFont, color: BrutalistTheme.dim, kerning: 1.3)
             }
         }
     }
@@ -213,10 +188,7 @@ struct MainWindowView: View {
             if confirmingStop {
                 HStack(spacing: 6) {
                     Text("stop timer?")
-                        .font(BrutalistTheme.metaFont)
-                        .foregroundColor(BrutalistTheme.dim2)
-                        .textCase(.uppercase)
-                        .kerning(1.3)
+                        .trackerLabel(font: BrutalistTheme.metaFont, color: BrutalistTheme.dim2, kerning: 1.3)
                     BrutalistTextButton(title: "yes") {
                         appState.stopTimer()
                         confirmingStop = false
@@ -238,25 +210,11 @@ struct MainWindowView: View {
     }
 
     private var timerDisplay: some View {
-        let text = HMS.hoursMinutesSeconds(appState.elapsedSeconds)
-        return Text(colorizeTimer(text))
+        return Text(TrackerText.timer(seconds: appState.elapsedSeconds))
             .font(BrutalistTheme.timerMainFont)
             .kerning(-0.3)
             .monospacedDigit()
             .fixedSize(horizontal: true, vertical: false)
-    }
-
-    private func colorizeTimer(_ text: String) -> AttributedString {
-        var attr = AttributedString(text)
-        attr.foregroundColor = BrutalistTheme.fg
-        for char in [":"] {
-            var search = attr.startIndex
-            while let range = attr[search...].range(of: char) {
-                attr[range].foregroundColor = BrutalistTheme.colonDim
-                search = range.upperBound
-            }
-        }
-        return attr
     }
 
     // MARK: - Entries
@@ -284,11 +242,8 @@ struct MainWindowView: View {
                 let count = appState.visibleEntries.count
                 let total = appState.visibleDayTotalSeconds()
                 if count > 0 {
-                    Text("\(count) \(count == 1 ? "entry" : "entries") · \(HMS.hoursMinutes(total))")
-                        .font(BrutalistTheme.metaFont)
-                        .foregroundColor(BrutalistTheme.dim)
-                        .textCase(.uppercase)
-                        .kerning(1.1)
+                    Text("\(count) \(count == 1 ? "entry" : "entries") · \(TimeMath.formatHM(seconds: total))")
+                        .trackerLabel(font: BrutalistTheme.metaFont, color: BrutalistTheme.dim, kerning: 1.1)
                 }
             }
 
@@ -310,7 +265,7 @@ struct MainWindowView: View {
 
     private var dayLabel: String {
         guard !appState.isViewingToday else { return "today" }
-        return Self.dayLabelFormatter.string(from: appState.selectedDay).lowercased()
+        return TrackerText.date(appState.selectedDay, label: .day, days: appState.days).lowercased()
     }
 
     private func showDay(step: Int) {
@@ -324,8 +279,8 @@ struct MainWindowView: View {
         let isRunning = appState.runningEntry?.id == entry.id
         return HStack(spacing: 8) {
             Text(entry.end == nil
-                 ? "\(Self.timeFormatter.string(from: entry.start)) →"
-                 : Self.timeFormatter.string(from: entry.start))
+                 ? "\(TrackerText.date(entry.start, label: .time, days: appState.days)) →"
+                 : TrackerText.date(entry.start, label: .time, days: appState.days))
                 .font(BrutalistTheme.bodyFont)
                 .foregroundColor(BrutalistTheme.dim2)
                 .frame(width: 62, alignment: .leading)
@@ -340,7 +295,7 @@ struct MainWindowView: View {
             DottedLeader()
 
             HStack(spacing: 4) {
-                Text(HMS.hoursMinutesSeconds(duration))
+                Text(TimeMath.formatHMS(seconds: duration))
                     .font(BrutalistTheme.bodyFont)
                     .foregroundColor(BrutalistTheme.fg)
                     .monospacedDigit()
@@ -372,20 +327,14 @@ struct MainWindowView: View {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("project →")
-                        .font(BrutalistTheme.labelFont)
-                        .foregroundColor(BrutalistTheme.dim)
-                        .textCase(.uppercase)
-                        .kerning(1.5)
+                        .trackerLabel(font: BrutalistTheme.labelFont, color: BrutalistTheme.dim, kerning: 1.5)
                     editorProjectPicker
                 }
             }
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("note")
-                        .font(BrutalistTheme.labelFont)
-                        .foregroundColor(BrutalistTheme.dim)
-                        .textCase(.uppercase)
-                        .kerning(1.5)
+                        .trackerLabel(font: BrutalistTheme.labelFont, color: BrutalistTheme.dim, kerning: 1.5)
                     TextField("", text: $editSession.note)
                         .textFieldStyle(.plain)
                         .font(BrutalistTheme.bodyFont)
@@ -419,10 +368,7 @@ struct MainWindowView: View {
     private func editField(label: String, text: Binding<String>, width: CGFloat, onCommit: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(BrutalistTheme.labelFont)
-                .foregroundColor(BrutalistTheme.dim)
-                .textCase(.uppercase)
-                .kerning(1.5)
+                .trackerLabel(font: BrutalistTheme.labelFont, color: BrutalistTheme.dim, kerning: 1.5)
             TextField("", text: text)
                 .textFieldStyle(.plain)
                 .font(BrutalistTheme.bodyFont)
@@ -503,19 +449,19 @@ struct MainWindowView: View {
 
     private func projectRow(_ project: Project) -> some View {
         HStack(spacing: 8) {
-            Text(project.name.lowercased())
+            Text(project.name)
                 .font(BrutalistTheme.bodyFont)
                 .foregroundColor(BrutalistTheme.fg)
                 .lineLimit(1)
                 .truncationMode(.tail)
             DottedLeader()
-            Text(HMS.hoursMinutes(appState.projectAllTimeSeconds(for: project.id)))
+            Text(TimeMath.formatHM(seconds: appState.projectAllTimeSeconds(for: project.id)))
                 .font(BrutalistTheme.bodyFont)
                 .foregroundColor(BrutalistTheme.dim2)
                 .monospacedDigit()
             if confirmingArchiveId == project.id {
                 HStack(spacing: 6) {
-                    Text("archive \"\(project.name.lowercased())\"?")
+                    Text("archive \"\(project.name)\"?")
                         .font(BrutalistTheme.metaFont)
                         .foregroundColor(BrutalistTheme.dim2)
                     BrutalistTextButton(title: "yes", danger: true) {
@@ -581,18 +527,18 @@ struct MainWindowView: View {
                     .font(BrutalistTheme.bodyFont)
                     .foregroundColor(BrutalistTheme.dim2)
                 DottedLeader()
-                Text(HMS.hoursMinutes(appState.todayTotalSeconds()))
+                Text(TimeMath.formatHM(seconds: appState.todayTotalSeconds()))
                     .font(BrutalistTheme.bodyFont)
                     .foregroundColor(BrutalistTheme.fg)
                     .monospacedDigit()
             }
 
             HStack(spacing: 8) {
-                Text("week")
+                Text("last 7d")
                     .font(BrutalistTheme.bodyFont)
                     .foregroundColor(BrutalistTheme.dim2)
                 DottedLeader()
-                Text(HMS.hoursMinutes(weekTotalSeconds()))
+                Text(TimeMath.formatHM(seconds: appState.recentTotalSeconds()))
                     .font(BrutalistTheme.bodyFont)
                     .foregroundColor(BrutalistTheme.fg)
                     .monospacedDigit()
@@ -603,12 +549,8 @@ struct MainWindowView: View {
         }
     }
 
-    private func weekTotalSeconds() -> Int {
-        appState.weeklyTotals().reduce(0) { $0 + $1.seconds }
-    }
-
     private var weekChart: some View {
-        let model = WeekChartModel(totals: appState.weeklyTotals(), days: appState.days)
+        let model = WeekChartModel(totals: appState.recentDayTotals(), days: appState.days)
         return HStack(alignment: .bottom, spacing: 6) {
             ForEach(model.bars) { day in
                 let isToday = day.isToday
@@ -621,7 +563,7 @@ struct MainWindowView: View {
                             .fill(isToday ? BrutalistTheme.accent : BrutalistTheme.fg)
                             .frame(height: CGFloat(day.height))
                     }
-                    Text(Self.dayFormatter.string(from: day.id).lowercased())
+                    Text(TrackerText.date(day.id, label: .weekday, days: appState.days).lowercased())
                         .font(BrutalistTheme.metaFont)
                         .foregroundColor(isToday ? BrutalistTheme.fg : BrutalistTheme.dim)
                     Text(day.label)

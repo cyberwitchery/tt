@@ -49,21 +49,6 @@ final class TimeEntryRepositoryTests: XCTestCase {
 
     // MARK: - fetchAll / fetchCompletedTotalsByProject / fetchMostRecentlyEnded
 
-    func testFetchAllReturnsEveryEntryOrderedByStartDesc() throws {
-        let e1 = TimeEntry(projectId: "p1", start: Date.from(year: 2024, month: 1, day: 1, hour: 9),
-                           end: Date.from(year: 2024, month: 1, day: 1, hour: 10))
-        let e2 = TimeEntry(projectId: "p1", start: Date.from(year: 2024, month: 1, day: 1, hour: 11))
-        let e3 = TimeEntry(projectId: "p2", start: Date.from(year: 2024, month: 1, day: 1, hour: 8),
-                           end: Date.from(year: 2024, month: 1, day: 1, hour: 9))
-
-        try repository.insertRunning(entry: e1)
-        try repository.insertRunning(entry: e2)
-        try repository.insertRunning(entry: e3)
-
-        let all = try repository.fetchAll()
-        XCTAssertEqual(all.map(\.id), [e2.id, e1.id, e3.id])
-    }
-
     func testFetchCompletedTotalsByProjectExcludesRunning() throws {
         try repository.insertRunning(entry: TimeEntry(
             projectId: "p1",

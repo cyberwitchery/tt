@@ -13,7 +13,7 @@ final class TimeTracker: ObservableObject {
     @Published private(set) var visibleEntries: [TimeEntry] = []
     /// days back from today. 0 is today.
     @Published private(set) var dayOffset: Int = 0
-    @Published private(set) var dailyTotals: [ProjectTotal] = []
+    @Published private(set) var projectTotalsForSelectedDay: [ProjectTotal] = []
     private var weekEntries: [TimeEntry] = []
     @Published private(set) var projectCompletedTotals: [String: Int] = [:]
     @Published private(set) var lastEntryEnd: Date?
@@ -29,7 +29,7 @@ final class TimeTracker: ObservableObject {
         return max(0, Int(days.now.timeIntervalSince(last).rounded(.down)))
     }
 
-    /// the day the entry list and `dailyTotals` describe.
+    /// the day the entry list and `projectTotalsForSelectedDay` describe.
     func selectedDay() -> Date {
         selectedDay(at: days.now).start
     }
@@ -41,17 +41,22 @@ final class TimeTracker: ObservableObject {
     var isViewingToday: Bool { dayOffset == 0 }
 
     /// step the selection by `days`, never past today.
-    func stepDay(by offset: Int) {
+    func stepDay(by offset: Int) throws {
         let target = min(0, dayOffset + offset)
         guard target != dayOffset else { return }
-        dayOffset = target
-        reload(at: days.now)
+        try browse(to: target)
     }
 
-    func goToToday() {
+    func goToToday() throws {
         guard dayOffset != 0 else { return }
-        dayOffset = 0
-        reload(at: days.now)
+        try browse(to: 0)
+    }
+
+    private func browse(to offset: Int) throws {
+        let previous = dayOffset
+        dayOffset = offset
+        do { try reload(at: days.now) }
+        catch { dayOffset = previous; throw error }
     }
 
     /// seconds tracked on the selected day, clipped to it.
@@ -71,19 +76,23 @@ final class TimeTracker: ObservableObject {
     }
 
     /// seconds tracked on each of the seven days ending on `now`'s day.
-    func weeklyTotals() -> [DayTotal] {
+    func recentDayTotals() -> [DayTotal] {
         let now = days.now
-        return ReportBuilder.weeklyTotals(
+        return ReportBuilder.dayTotals(
             entries: weekEntries,
             week: days.week(endingOn: now),
             now: now
         )
     }
 
+    func recentTotalSeconds() -> Int {
+        recentDayTotals().reduce(0) { $0 + $1.seconds }
+    }
+
     /// reload when `now` has crossed midnight since the last fetch, holding a
     /// browsed day on its own date. true if it reloaded.
     @discardableResult
-    func rollOverIfNeeded() -> Bool {
+    func rollOverIfNeeded() throws -> Bool {
         guard let loadedDay else { return false }
         let now = days.now
         let today = days.day(containing: now)
@@ -93,7 +102,7 @@ final class TimeTracker: ObservableObject {
             let crossed = days.daysBetween(loadedDay, and: today)
             dayOffset = min(0, dayOffset - crossed)
         }
-        reload(at: now)
+        try reload(at: now)
         return true
     }
 
@@ -120,7 +129,7 @@ final class TimeTracker: ObservableObject {
         loadedDay = days.day(containing: now)
         todaysEntries = try timeEntryRepository.fetchEntries(on: days.day(containing: now))
         visibleEntries = todaysEntries
-        refreshReports(at: now)
+        try refreshReports(at: now)
     }
 
     // MARK: - Timer Control
@@ -134,7 +143,7 @@ final class TimeTracker: ObservableObject {
         try timeEntryRepository.insertRunning(entry: entry)
         runningEntry = entry
         dayOffset = 0
-        reload(at: now)
+        try reload(at: now)
     }
 
     func stopTimer() throws {
@@ -143,7 +152,7 @@ final class TimeTracker: ObservableObject {
         _ = try timeEntryRepository.stopRunning(entry: entry, end: now)
         runningEntry = nil
         dayOffset = 0
-        reload(at: now)
+        try reload(at: now)
     }
 
     var isRunning: Bool {
@@ -166,12 +175,12 @@ final class TimeTracker: ObservableObject {
         guard !trimmed.isEmpty else { return }
 
         try projectRepository.insert(Project(name: trimmed.lowercased()))
-        refreshProjects(keepSelection: true)
+        try refreshProjects()
     }
 
     func archiveProject(id: String) throws {
         try projectRepository.archive(projectId: id)
-        refreshProjects(keepSelection: false)
+        try refreshProjects()
     }
 
     func projectName(for projectId: String) -> String {
@@ -180,10 +189,6 @@ final class TimeTracker: ObservableObject {
 
     // MARK: - Entry Management
     
-    func getEntry(id: String) throws -> TimeEntry? {
-        return try timeEntryRepository.get(id: id)
-    }
-
     func updateEntry(id: String, start: Date, end: Date?, note: String?, projectId: String? = nil) throws {
         let sanitizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedEnd = end.map { max($0, start) }
@@ -198,90 +203,66 @@ final class TimeTracker: ObservableObject {
         try timeEntryRepository.update(entry)
         try timeEntryRepository.resolveMultipleRunningEntries()
         runningEntry = try timeEntryRepository.fetchRunning()
-        reload(at: days.now)
+        try reload(at: days.now)
     }
 
     func deleteEntry(id: String) throws {
         try timeEntryRepository.delete(id: id)
         runningEntry = try timeEntryRepository.fetchRunning()
-        reload(at: days.now)
+        try reload(at: days.now)
     }
 
     // MARK: - Refresh
 
-    func refreshProjects(keepSelection: Bool) {
-        do {
-            try loadProjects()
-            if keepSelection {
-                return
-            }
-            if let selectedProjectId, projects.contains(where: { $0.id == selectedProjectId }) {
-                return
-            }
+    func refreshProjects() throws {
+        try loadProjects()
+        if !projects.contains(where: { $0.id == selectedProjectId }) {
             selectedProjectId = projects.first?.id
-        } catch {
-            projects = []
-            allProjectNames = [:]
         }
-        refreshReports()
+        try refreshReports()
     }
 
     private func loadProjects() throws {
-        projects = try projectRepository.fetchAllActive()
+        let active = try projectRepository.fetchAllActive()
         let all = try projectRepository.fetchAll()
-        allProjectNames = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0.name.lowercased()) })
+        projects = active
+        allProjectNames = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0.name) })
     }
 
-    func refreshEntries() {
-        refreshEntries(at: days.now)
+    func refreshEntries() throws {
+        try refreshEntries(at: days.now)
     }
 
-    private func refreshEntries(at now: Date) {
+    private func refreshEntries(at now: Date) throws {
+        let today = try timeEntryRepository.fetchEntries(on: days.day(containing: now))
+        let visible = isViewingToday ? today : try timeEntryRepository.fetchEntries(on: selectedDay(at: now))
         loadedDay = days.day(containing: now)
-        do {
-            todaysEntries = try timeEntryRepository.fetchEntries(on: days.day(containing: now))
-            if isViewingToday {
-                visibleEntries = todaysEntries
-            } else {
-                visibleEntries = try timeEntryRepository.fetchEntries(on: selectedDay(at: now))
-            }
-        } catch {
-            todaysEntries = []
-            visibleEntries = []
-        }
+        todaysEntries = today
+        visibleEntries = visible
     }
 
-    func refreshReports() {
-        refreshReports(at: days.now)
+    func refreshReports() throws {
+        try refreshReports(at: days.now)
     }
 
-    private func reload(at now: Date) {
-        refreshEntries(at: now)
-        refreshReports(at: now)
+    private func reload(at now: Date) throws {
+        try refreshEntries(at: now)
+        try refreshReports(at: now)
     }
 
-    private func refreshReports(at now: Date) {
-        do {
-            let day = selectedDay(at: now).range
-
-            let dailyEntries = try timeEntryRepository.fetchEntries(in: day)
-            weekEntries = try timeEntryRepository.fetchEntries(in: days.week(endingOn: now).range)
-
-            dailyTotals = ReportBuilder.dailyTotals(
-                entries: dailyEntries,
-                rangeStart: day.lowerBound,
-                rangeEnd: day.upperBound,
-                now: now,
-                projectNameForId: { self.projectName(for: $0) }
-            )
-            projectCompletedTotals = (try? timeEntryRepository.fetchCompletedTotalsByProject()) ?? [:]
-            lastEntryEnd = (try? timeEntryRepository.fetchMostRecentlyEnded())?.end
-        } catch {
-            dailyTotals = []
-            weekEntries = []
-            projectCompletedTotals = [:]
-            lastEntryEnd = nil
-        }
+    private func refreshReports(at now: Date) throws {
+        let day = selectedDay(at: now).range
+        let dailyEntries = try timeEntryRepository.fetchEntries(in: day)
+        let recentEntries = try timeEntryRepository.fetchEntries(in: days.week(endingOn: now).range)
+        let completed = try timeEntryRepository.fetchCompletedTotalsByProject()
+        let last = try timeEntryRepository.fetchMostRecentlyEnded()?.end
+        projectTotalsForSelectedDay = ReportBuilder.projectTotals(
+            entries: dailyEntries, rangeStart: day.lowerBound, rangeEnd: day.upperBound, now: now,
+            projectNameForId: { self.projectName(for: $0) }
+        )
+        weekEntries = recentEntries
+        projectCompletedTotals = completed
+        lastEntryEnd = last
     }
 
     func projectAllTimeSeconds(for projectId: String) -> Int {
@@ -297,7 +278,7 @@ final class TimeTracker: ObservableObject {
     func exportCSV(range: Range<Date>, to url: URL) throws {
         let entries = try timeEntryRepository.fetchEntries(in: range)
         let allProjects = try projectRepository.fetchAll()
-        let projectNames = Dictionary(uniqueKeysWithValues: allProjects.map { ($0.id, $0.name.lowercased()) })
+        let projectNames = Dictionary(uniqueKeysWithValues: allProjects.map { ($0.id, $0.name) })
 
         let output = CSVExporter.buildCSV(entries: entries, projectNames: projectNames, now: days.now)
         try output.write(to: url, atomically: true, encoding: .utf8)

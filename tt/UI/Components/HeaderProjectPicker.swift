@@ -14,7 +14,7 @@ struct HeaderProjectPicker: View {
     @FocusState private var addFocused: Bool
 
     private var selectedName: String {
-        projects.first { $0.id == selectedId }?.name.lowercased() ?? "—"
+        projects.first { $0.id == selectedId }?.name ?? "—"
     }
 
     var body: some View {
@@ -48,13 +48,13 @@ struct HeaderProjectPicker: View {
                     isOpen = false
                 }) {
                     HStack {
-                        Text(project.name.lowercased())
+                        Text(project.name)
                             .font(BrutalistTheme.bodyFont)
                             .foregroundColor(project.id == selectedId
                                 ? BrutalistTheme.accent
                                 : BrutalistTheme.fg)
                         Spacer()
-                        Text(HMS.hoursMinutes(allTimeSeconds(project.id)))
+                        Text(TimeMath.formatHM(seconds: allTimeSeconds(project.id)))
                             .font(BrutalistTheme.metaFont)
                             .foregroundColor(BrutalistTheme.dim)
                     }
@@ -134,39 +134,5 @@ struct HeaderProjectPicker: View {
         adding = false
         newName = ""
         addFocused = false
-    }
-}
-
-/// shared HH:MM / HH:MM:SS helpers for the ui layer.
-enum HMS {
-    /// `HHHH:MM` (unpadded hours when large, zero-padded otherwise). no seconds.
-    static func hoursMinutes(_ seconds: Int) -> String {
-        let clamped = max(0, seconds)
-        let h = clamped / 3600
-        let m = (clamped % 3600) / 60
-        if h >= 100 {
-            return String(format: "%d:%02d", h, m)
-        }
-        return String(format: "%02d:%02d", h, m)
-    }
-
-    /// `HH:MM:SS`, timer-style. hours unpadded when >= 1000.
-    static func hoursMinutesSeconds(_ seconds: Int) -> String {
-        let clamped = max(0, seconds)
-        let h = clamped / 3600
-        let m = (clamped % 3600) / 60
-        let s = clamped % 60
-        if h >= 1000 {
-            return String(format: "%d:%02d:%02d", h, m, s)
-        }
-        return String(format: "%02d:%02d:%02d", h, m, s)
-    }
-
-    /// `H:MM` with unpadded hours (for `idle 0:04`, `idle 12:30`).
-    static func idleHours(_ seconds: Int) -> String {
-        let clamped = max(0, seconds)
-        let h = clamped / 3600
-        let m = (clamped % 3600) / 60
-        return String(format: "%d:%02d", h, m)
     }
 }
