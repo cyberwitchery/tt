@@ -3,6 +3,32 @@ import GRDB
 @testable import tt
 
 final class TimeEntryRepositoryTests: XCTestCase {
+    func testReopeningAnEntryCannotSilentlyReplaceARunningTimer() throws {
+        let start = Date.from(year: 2026, month: 1, day: 1, hour: 9)
+        let running = TimeEntry(projectId: "p", start: start)
+        var ended = TimeEntry(projectId: "p", start: start - 3600, end: start)
+        try repository.insertRunning(entry: running)
+        try repository.insertRunning(entry: ended)
+        ended.end = nil
+        XCTAssertThrowsError(try repository.update(ended)) { error in
+            XCTAssertTrue(error.localizedDescription.contains("Stop the running timer"))
+        }
+        XCTAssertNil(try repository.get(id: running.id)?.end)
+        XCTAssertEqual(try repository.get(id: ended.id)?.end, start)
+    }
+
+    func testCompletedTotalsFloorElapsedTimeRatherThanEachTimestamp() throws {
+        let base = Date.from(year: 2026, month: 1, day: 1)
+        for (projectId, from, to, expected) in [("a", 0.9, 1.1, 0), ("b", 0.1, 2.9, 2)] {
+            let entry = TimeEntry(projectId: projectId, start: base + from, end: base + to)
+            try repository.insertRunning(entry: entry)
+            let stored = try XCTUnwrap(repository.get(id: entry.id))
+            let end = try XCTUnwrap(stored.end)
+            XCTAssertEqual(TimeMath.durationSeconds(start: stored.start, end: end), expected)
+            XCTAssertEqual(try repository.fetchCompletedTotalsByProject()[projectId], expected)
+        }
+    }
+
     var dbQueue: DatabaseQueue!
     var repository: TimeEntryRepository!
 

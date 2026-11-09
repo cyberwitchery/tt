@@ -1,6 +1,14 @@
 import Foundation
 import GRDB
 
+enum TimeEntryError: LocalizedError {
+    case anotherTimerRunning
+
+    var errorDescription: String? {
+        "Stop the running timer before reopening this entry."
+    }
+}
+
 struct Project: Codable, FetchableRecord, PersistableRecord, Identifiable, Equatable {
     static let databaseTableName = "projects"
 

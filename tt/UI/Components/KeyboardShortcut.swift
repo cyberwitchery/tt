@@ -1,9 +1,10 @@
-import Foundation
+import AppKit
 
 enum KeyboardShortcut: Equatable {
     case space, n, p, e, t, escape, leftArrow, rightArrow
 
-    init?(keyCode: UInt16, textFocused: Bool) {
+    init?(keyCode: UInt16, textFocused: Bool, modifiers: NSEvent.ModifierFlags = []) {
+        guard modifiers.intersection([.command, .control, .option]).isEmpty else { return nil }
         guard !textFocused || keyCode == 53 else { return nil }
         switch keyCode {
         case 49: self = .space

@@ -38,23 +38,29 @@ struct MainWindowView: View {
                         .padding(.top, 40)
                 }
                 headerRow
+                    .disabled(!appState.isStorageAvailable)
                     .padding(.top, appState.lastError == nil ? 40 : 10)
                     .zIndex(20) // header dropdown must float above later sections
                 timerRow
+                    .disabled(!appState.isStorageAvailable)
                     .padding(.top, 14)
                 BrutalistDivider()
 
                 entriesSection
+                    .disabled(!appState.isStorageAvailable)
                     .zIndex(10) // entry editor's inline project picker floats above projects/reports/export
                 BrutalistDivider()
 
                 projectsSection
+                    .disabled(!appState.isStorageAvailable)
                 BrutalistDivider()
 
                 reportsSection
+                    .disabled(!appState.isStorageAvailable)
                 BrutalistDivider()
 
                 exportSection
+                    .disabled(!appState.isStorageAvailable)
                     .padding(.bottom, 4)
             }
             .padding(.horizontal, BrutalistTheme.padding)
@@ -74,9 +80,10 @@ struct MainWindowView: View {
     // MARK: - Keyboard
 
     private func handleKey(_ event: NSEvent) -> NSEvent? {
+        guard appState.isStorageAvailable else { return event }
         let isTextFocused = event.window?.firstResponder is NSText
 
-        guard let shortcut = KeyboardShortcut(keyCode: event.keyCode, textFocused: isTextFocused) else { return event }
+        guard let shortcut = KeyboardShortcut(keyCode: event.keyCode, textFocused: isTextFocused, modifiers: event.modifierFlags) else { return event }
 
         switch shortcut {
         case .space:
@@ -164,10 +171,10 @@ struct MainWindowView: View {
             Text(message)
                 .font(BrutalistTheme.bodyFont)
                 .foregroundColor(BrutalistTheme.fg)
-                .lineLimit(2)
+                .lineLimit(appState.isStorageAvailable ? 2 : nil)
             Spacer()
-            BrutalistTextButton(title: "dismiss", muted: true) {
-                appState.dismissError()
+            if appState.storageError == nil {
+                BrutalistTextButton(title: "dismiss", muted: true) { appState.dismissError() }
             }
         }
         .padding(.vertical, 8)
@@ -320,7 +327,7 @@ struct MainWindowView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 editField(label: "start", text: $editSession.startText, width: 58, onCommit: { editSession.commit(.start) })
-                editField(label: "end", text: $editSession.endText, width: 58, onCommit: { editSession.commit(.end) })
+                editField(label: editSession.endDayOffset > 0 ? "end +\(editSession.endDayOffset)d" : "end", text: $editSession.endText, width: 58, onCommit: { editSession.commit(.end) })
                 editField(label: "dur", text: $editSession.durationText, width: 82, onCommit: { editSession.commit(.duration) })
                 Spacer()
             }
@@ -395,10 +402,7 @@ struct MainWindowView: View {
             ),
             allTimeSeconds: { appState.projectAllTimeSeconds(for: $0) },
             onCreateProject: { name in
-                appState.createProject(name: name)
-                if let created = appState.projects.last(where: { $0.name.lowercased() == name.lowercased() }) {
-                    editSession.projectId = created.id
-                }
+                if let created = appState.createProject(name: name) { editSession.projectId = created.id }
             },
             isOpen: $editSession.projectPickerOpen
         )
@@ -621,8 +625,11 @@ struct MainWindowView: View {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType.commaSeparatedText]
         panel.nameFieldStringValue = "tt-export.csv"
-        if panel.runModal() == .OK, let url = panel.url {
+        let save: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .OK, let url = panel.url else { return }
             appState.exportCSV(range: range, to: url)
         }
+        if let window = NSApp.keyWindow { panel.beginSheetModal(for: window, completionHandler: save) }
+        else { panel.begin(completionHandler: save) }
     }
 }

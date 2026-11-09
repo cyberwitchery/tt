@@ -28,10 +28,15 @@ final class KeyCatcherNSView: NSView {
         removeMonitor()
         guard window != nil else { return }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, let window = self.window else { return event }
-            guard event.window === window else { return event }
-            return self.handler?(event) ?? event
+            guard let self else { return event }
+            return self.handle(event)
         }
+    }
+
+    func handle(_ event: NSEvent) -> NSEvent? {
+        guard let window, event.window === window else { return event }
+        guard let handler else { return event }
+        return handler(event)
     }
 
     private func removeMonitor() {

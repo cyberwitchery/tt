@@ -340,6 +340,17 @@ final class EntryEditSessionTests: XCTestCase {
         return EntryEditSession(days: DayCalendar(calendar: { calendar }))
     }
 
+    func testEndDayOffsetDistinguishesAFullDayFromZeroDuration() {
+        let start = Date.from(year: 2026, month: 1, day: 1, hour: 9)
+        var session = session()
+        XCTAssertEqual(session.endDayOffset, 0)
+        session.begin(TimeEntry(projectId: "p", start: start, end: start + 86400))
+        XCTAssertEqual(session.startText, session.endText)
+        XCTAssertEqual(session.endDayOffset, 1)
+        session.durationText = "00:00:00"
+        XCTAssertEqual(session.endDayOffset, 0)
+    }
+
     func testSaveAppliesAllTypedFieldsAndProjectFallback() throws {
         let start = Date.from(year: 2026, month: 1, day: 1, hour: 9)
         let entry = TimeEntry(projectId: "original", start: start, end: start + 3600)

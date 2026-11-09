@@ -21,6 +21,24 @@ final class AppStateTests: XCTestCase {
         let state = AppState(database: .failure(error))
         XCTAssertNotNil(state.lastError)
         XCTAssertTrue(state.projects.isEmpty)
+        XCTAssertFalse(state.isStorageAvailable)
+        XCTAssertNotNil(state.storageError)
+        XCTAssertTrue(state.lastError?.contains("database unavailable") == true)
+        state.dismissError()
+        XCTAssertNotNil(state.lastError)
+        state.startTimer()
+        XCTAssertNil(state.runningEntry)
+        XCTAssertTrue(state.lastError?.contains("database unavailable") == true)
+    }
+
+    @MainActor
+    func testTimerFiresWhileTheRunLoopTracksPanelEvents() {
+        var fired = false
+        let timer = AppState.scheduleTimer(interval: 0.01) { fired = true }
+        defer { timer.invalidate() }
+        let deadline = Date(timeIntervalSinceNow: 0.2)
+        while !fired && Date() < deadline { RunLoop.main.run(mode: .eventTracking, before: deadline) }
+        XCTAssertTrue(fired)
     }
 
     @MainActor
