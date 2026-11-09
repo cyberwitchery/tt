@@ -186,9 +186,9 @@ final class TimeTracker: ObservableObject {
 
     func updateEntry(id: String, start: Date, end: Date?, note: String?, projectId: String? = nil) throws {
         let sanitizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedEnd = end.map { max($0, start) }
-
         guard var entry = try timeEntryRepository.get(id: id) else { return }
+        // An editor opened while running may still submit nil after the timer stopped.
+        let normalizedEnd = (end ?? entry.end).map { max($0, start) }
         entry.start = start
         entry.end = normalizedEnd
         entry.note = sanitizedNote?.isEmpty == true ? nil : sanitizedNote
