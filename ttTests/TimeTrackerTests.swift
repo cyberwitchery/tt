@@ -1,4 +1,5 @@
 import XCTest
+import Combine
 import GRDB
 @testable import tt
 
@@ -453,65 +454,59 @@ final class TimeTrackerTests: XCTestCase {
         XCTAssertTrue(content.contains("3600"))
     }
 
-    // MARK: - Delegate
+    // MARK: - Observation
 
-    func testDelegateCalledOnStartTimer() throws {
-        let delegate = MockDelegate()
-        tracker.delegate = delegate
+    func testObserversNotifiedOnStartTimer() throws {
+        var notifications = 0
+        let observation = tracker.objectWillChange.sink { notifications += 1 }
+        defer { observation.cancel() }
         try tracker.loadInitialState()
 
         try tracker.startTimer()
 
-        XCTAssertTrue(delegate.didUpdateCalled)
+        XCTAssertGreaterThan(notifications, 0)
     }
 
-    func testDelegateCalledOnStopTimer() throws {
-        let delegate = MockDelegate()
-        tracker.delegate = delegate
+    func testObserversNotifiedOnStopTimer() throws {
+        var notifications = 0
+        let observation = tracker.objectWillChange.sink { notifications += 1 }
+        defer { observation.cancel() }
         try tracker.loadInitialState()
         try tracker.startTimer()
-        delegate.didUpdateCalled = false
+        notifications = 0
 
         try tracker.stopTimer()
 
-        XCTAssertTrue(delegate.didUpdateCalled)
+        XCTAssertGreaterThan(notifications, 0)
     }
 
-    func testDelegateCalledOnUpdateEntry() throws {
-        let delegate = MockDelegate()
-        tracker.delegate = delegate
+    func testObserversNotifiedOnUpdateEntry() throws {
+        var notifications = 0
+        let observation = tracker.objectWillChange.sink { notifications += 1 }
+        defer { observation.cancel() }
         try tracker.loadInitialState()
         try tracker.startTimer()
         try tracker.stopTimer()
-        delegate.didUpdateCalled = false
+        notifications = 0
         let entryId = tracker.todaysEntries[0].id
 
         try tracker.updateEntry(id: entryId, start: Date(), end: Date(), note: nil)
 
-        XCTAssertTrue(delegate.didUpdateCalled)
+        XCTAssertGreaterThan(notifications, 0)
     }
 
-    func testDelegateCalledOnDeleteEntry() throws {
-        let delegate = MockDelegate()
-        tracker.delegate = delegate
+    func testObserversNotifiedOnDeleteEntry() throws {
+        var notifications = 0
+        let observation = tracker.objectWillChange.sink { notifications += 1 }
+        defer { observation.cancel() }
         try tracker.loadInitialState()
         try tracker.startTimer()
         try tracker.stopTimer()
-        delegate.didUpdateCalled = false
+        notifications = 0
         let entryId = tracker.todaysEntries[0].id
 
         try tracker.deleteEntry(id: entryId)
 
-        XCTAssertTrue(delegate.didUpdateCalled)
-    }
-}
-
-// MARK: - Mock Delegate
-
-private class MockDelegate: TimeTrackerDelegate {
-    var didUpdateCalled = false
-
-    func timeTrackerDidUpdate() {
-        didUpdateCalled = true
+        XCTAssertGreaterThan(notifications, 0)
     }
 }
