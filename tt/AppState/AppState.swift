@@ -84,28 +84,27 @@ final class AppState: ObservableObject {
     }
 
     func loadInitialState() {
+        defer { restartTimerIfNeeded(); startIdleTimer() }
         do {
             try tracker.loadInitialState()
-            restartTimerIfNeeded()
-            startIdleTimer()
         } catch {
             surfaceError(error)
         }
     }
 
     func startTimer() {
+        defer { restartTimerIfNeeded() }
         do {
             try tracker.startTimer()
-            restartTimerIfNeeded()
         } catch {
             surfaceError(error)
         }
     }
 
     func stopTimer() {
+        defer { restartTimerIfNeeded() }
         do {
             try tracker.stopTimer()
-            stopTimerUpdates()
         } catch {
             surfaceError(error)
         }
@@ -174,18 +173,18 @@ final class AppState: ObservableObject {
     }
 
     func updateEntry(id: String, start: Date, end: Date?, note: String?, projectId: String? = nil) {
+        defer { restartTimerIfNeeded() }
         do {
             try tracker.updateEntry(id: id, start: start, end: end, note: note, projectId: projectId)
-            restartTimerIfNeeded()
         } catch {
             surfaceError(error)
         }
     }
 
     func deleteEntry(id: String) {
+        defer { restartTimerIfNeeded() }
         do {
             try tracker.deleteEntry(id: id)
-            restartTimerIfNeeded()
         } catch {
             surfaceError(error)
         }
